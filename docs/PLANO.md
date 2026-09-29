@@ -55,3 +55,13 @@ Legenda: ✅ entregue nesta base · ⏭ próxima fase
 ## Fase 8 — Qualidade contínua ⏭
 - Conjunto de avaliação com autos anonimizados, medindo adstrição, fidelidade e extensão por modelo.
 - Testes de integração das rotas com provedores simulados; testes das regras do Firestore no emulador.
+
+## Migração do legado ⏭
+O sistema anterior está em `legado/` (fora do build). Funcionalidades dele que ainda não existem no sistema novo, a portar em PRs separados:
+- Mutirão Previdenciário (extração de atas e vídeos de audiência) — `legado/src/components/MutiraoPrevidenciarioView.tsx`, rotas `/api/mutirao-*` em `legado/server.ts`
+- Petições iniciais para advogados — `legado/server/petitionAdvogadoRoutes.ts`, `InitialPetitionPanel.tsx`
+- Manual do Sistema e Tour Guiado — `SystemManualModal.tsx`, `SystemTour.tsx` (regra do AGENTS.md antigo: atualizar a cada entrega)
+- Guia do PROJUDI, calendário de prazos do gabinete, tickets de suporte e avisos globais
+- Gerenciador de prompts personalizados, histórico e comparação de versões de minutas, painel Fato × Prova, Raio-X do processo
+- Consulta legislativa e extensão de navegador para importar autos
+- Migração de dados: ler as coleções existentes no Firestore do sistema antigo (prompts, teses, paradigmas, guias, agenda, equipe) SEM sobrescrever nada, mapeando para o layout `gabinetes/{tenant}/…` do sistema novo
