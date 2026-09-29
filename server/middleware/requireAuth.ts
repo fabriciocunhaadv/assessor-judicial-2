@@ -1,9 +1,10 @@
 import type { NextFunction, Request, Response } from "express";
-import { normalizeRole, type Role } from "../../shared/roles.js";
+import type { Role } from "../../shared/roles.js";
 import { env } from "../config/env.js";
 import { adminAuth } from "../lib/firebaseAdmin.js";
 import { HttpError } from "../lib/httpError.js";
 import { repo } from "../repositories/index.js";
+import { resolverPerfil } from "../services/perfil.js";
 
 export interface AuthUser {
   uid: string;
@@ -11,6 +12,7 @@ export interface AuthUser {
   nome: string;
   role: Role;
   tenantId: string;
+  unidadesLiberadas: string[];
 }
 
 declare global {
@@ -29,7 +31,7 @@ declare global {
 export async function requireAuth(req: Request, _res: Response, next: NextFunction) {
   try {
     if (env.authDisabled && !env.isProd) {
-      req.user = { uid: "dev", email: "dev@local", nome: "Desenvolvedor", role: "super_admin", tenantId: "gabinete_dev" };
+      req.user = { uid: "dev", email: "dev@local", nome: "Desenvolvedor", role: "super_admin", tenantId: "gabinete_dev", unidadesLiberadas: [] };
       return next();
     }
     const header = req.headers.authorization ?? "";
@@ -38,19 +40,22 @@ export async function requireAuth(req: Request, _res: Response, next: NextFuncti
 
     const decoded = await adminAuth().verifyIdToken(token, true);
     const email = (decoded.email ?? "").toLowerCase();
-    const perfil = await repo().usuarios.get(decoded.uid);
-
-    if (!perfil && !env.superAdminEmails.includes(email)) {
-      throw new HttpError(403, "Usuário sem cadastro em nenhum gabinete. Solicite convite ao Juiz Titular.");
+    const r = await resolverPerfil(repo(), decoded.uid, email, decoded.name ?? "", env.superAdminEmails);
+    if (!r) throw new HttpError(403, "Seu e-mail ainda não foi convidado para nenhum gabinete. Peça o convite ao Juiz Titular.");
+    const perfil = r.usuario;
+    if (perfil?.ativo === false) throw new HttpError(403, "Acesso suspenso. Fale com o Juiz Titular do gabinete.");
+    if (perfil && r.role !== "super_admin") {
+      const g = await repo().gabinetes.get(perfil.tenantId);
+      if (g?.status === "suspenso") throw new HttpError(403, "Este gabinete está suspenso. Fale com o administrador do sistema.");
     }
-    if (perfil?.ativo === false) throw new HttpError(403, "Acesso suspenso.");
 
     req.user = {
       uid: decoded.uid,
       email,
       nome: perfil?.nome ?? decoded.name ?? email,
-      role: env.superAdminEmails.includes(email) ? "super_admin" : normalizeRole(perfil?.role),
-      tenantId: perfil?.tenantId ?? "sem_gabinete",
+      role: r.role,
+      tenantId: r.tenantId,
+      unidadesLiberadas: perfil?.unidadesLiberadas ?? [],
     };
     next();
   } catch (err) {

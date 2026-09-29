@@ -41,7 +41,7 @@ export default function Precedentes() {
 
   return (
     <Card title={`Repositório vinculante (${itens.length})`} actions={pode("precedentes:importar") && (
-      <label className="cursor-pointer"><span className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white">{importando ? "Importando…" : <><Upload className="h-4 w-4" /> Importar PDF de informativo</>}</span><input type="file" accept="application/pdf" className="hidden" disabled={importando} onChange={(e) => importar(e.target.files?.[0])} /></label>
+      <label className="cursor-pointer"><span className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white">{importando ? "Importando…" : <><Upload className="h-4 w-4" /> Importar PDF de informativo</>}</span><input type="file" accept="application/pdf" className="hidden" disabled={importando} onChange={(e) => importar(e.target.files?.[0])} /></label>
     )}>
       <div className="mb-3 flex flex-wrap gap-2">
         {TRIBUNAIS.map((t) => <Button key={t} variant={filtro === t ? "primary" : "ghost"} onClick={() => setFiltro(t)}>{t}</Button>)}

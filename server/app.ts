@@ -24,14 +24,16 @@ export function createApp() {
   app.get("/api/health", (_req, res) => res.json({ ok: true }));
 
   // Tudo abaixo exige usuário autenticado (ID Token do Firebase) — inclusive o uso das chaves de IA.
-  app.use("/api", requireAuth, rateLimit({ windowMs: 60_000, max: 60 }));
+  // Limite geral folgado (navegação carrega várias listas) e um limite próprio para chamadas que usam IA.
+  app.use("/api", requireAuth, rateLimit({ windowMs: 60_000, max: 300 }));
+  const limiteIA = rateLimit({ windowMs: 60_000, max: 20 });
   app.use("/api", miscRouter);
-  app.use("/api/minutas", minutasRouter);
-  app.use("/api/lupa", lupaRouter);
-  app.use("/api/audiencia", audienciaRouter);
-  app.use("/api/chat", chatRouter);
+  app.use("/api/minutas", (req, res, next) => (req.method === "POST" ? limiteIA(req, res, next) : next()), minutasRouter);
+  app.use("/api/lupa", limiteIA, lupaRouter);
+  app.use("/api/audiencia", limiteIA, audienciaRouter);
+  app.use("/api/chat", limiteIA, chatRouter);
   app.use("/api/pdf", pdfRouter);
-  app.use("/api/precedentes", precedentesRouter);
+  app.use("/api/precedentes", (req, res, next) => (req.path.startsWith("/importar") ? limiteIA(req, res, next) : next()), precedentesRouter);
   app.use("/api/gabinete", gabineteRouter);
   app.use("/api/admin", adminRouter);
 

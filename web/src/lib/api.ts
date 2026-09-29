@@ -24,8 +24,11 @@ export const api = {
   async get<T>(path: string): Promise<T> {
     return handle<T>(await fetch(`/api${path}`, { headers: await headers(false) }));
   },
-  async post<T>(path: string, body: unknown, method: "POST" | "PUT" = "POST"): Promise<T> {
+  async post<T>(path: string, body: unknown, method: "POST" | "PUT" | "PATCH" = "POST"): Promise<T> {
     return handle<T>(await fetch(`/api${path}`, { method, headers: await headers(true), body: JSON.stringify(body) }));
+  },
+  async del<T>(path: string): Promise<T> {
+    return handle<T>(await fetch(`/api${path}`, { method: "DELETE", headers: await headers(false) }));
   },
   async upload<T>(path: string, file: File): Promise<T> {
     const fd = new FormData();

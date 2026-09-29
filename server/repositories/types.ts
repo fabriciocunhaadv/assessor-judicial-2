@@ -8,6 +8,55 @@ export interface Usuario {
   role: string;
   tenantId: string;
   ativo: boolean;
+  /** Ids das unidades (lotações) que o membro pode usar. Vazio = todas as do gabinete. */
+  unidadesLiberadas?: string[];
+}
+
+/** Convite por e-mail: vira perfil no primeiro login com esse e-mail (Google). */
+export interface Convite {
+  email: string;
+  nome: string;
+  role: string;
+  tenantId: string;
+  unidadesLiberadas: string[];
+  convidadoPor: string;
+  criadoEm: number;
+}
+
+/** Lotação / unidade judiciária (vara, juizado, comarca). */
+export interface Unidade {
+  id: string;
+  nome: string;
+  comarca: string;
+  competencia: string;
+  ativa: boolean;
+}
+
+/** Prompt do gabinete por área: instruções que entram na Etapa 2 quando selecionado. */
+export interface PromptGabinete {
+  id: string;
+  titulo: string;
+  area: string;
+  texto: string;
+  ativo: boolean;
+  atualizadoPor: string;
+  atualizadoEm: number;
+}
+
+export interface Gabinete {
+  id: string;
+  nome: string;
+  juizTitular: string;
+  status: "ativo" | "suspenso";
+  criadoEm: number;
+}
+
+export interface Comunicado {
+  texto: string;
+  nivel: "info" | "alerta";
+  ativo: boolean;
+  atualizadoPor: string;
+  atualizadoEm: number;
 }
 
 export interface Tese {
@@ -68,7 +117,33 @@ export interface Repositorio {
   usuarios: {
     get(uid: string): Promise<Usuario | null>;
     listarDoGabinete(tenantId: string): Promise<Usuario[]>;
+    listarTodos(): Promise<Usuario[]>;
     salvar(u: Usuario): Promise<void>;
+  };
+  convites: {
+    get(email: string): Promise<Convite | null>;
+    listarDoGabinete(tenantId: string): Promise<Convite[]>;
+    salvar(c: Convite): Promise<void>;
+    remover(email: string): Promise<void>;
+  };
+  unidades: {
+    listar(tenantId: string): Promise<Unidade[]>;
+    salvar(tenantId: string, u: Unidade): Promise<void>;
+  };
+  prompts: {
+    listar(tenantId: string): Promise<PromptGabinete[]>;
+    get(tenantId: string, id: string): Promise<PromptGabinete | null>;
+    salvar(tenantId: string, p: PromptGabinete): Promise<void>;
+  };
+  gabinetes: {
+    listar(): Promise<Gabinete[]>;
+    get(id: string): Promise<Gabinete | null>;
+    salvar(g: Gabinete): Promise<void>;
+  };
+  comunicados: {
+    /** tenantId null = comunicado global (Super Admin). */
+    get(tenantId: string | null): Promise<Comunicado | null>;
+    salvar(tenantId: string | null, c: Comunicado): Promise<void>;
   };
   teses: {
     listar(tenantId: string): Promise<Tese[]>;
@@ -87,6 +162,8 @@ export interface Repositorio {
   minutas: {
     registrar(tenantId: string, r: RegistroMinuta): Promise<void>;
     listar(tenantId: string, limite?: number): Promise<RegistroMinuta[]>;
+    /** Quantidade de minutas (de um gabinete ou de todos). */
+    contar(tenantId?: string): Promise<number>;
   };
   uso: {
     registrar(r: RegistroUso): Promise<void>;

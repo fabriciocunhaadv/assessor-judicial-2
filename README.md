@@ -22,7 +22,7 @@ Com `AUTH_DISABLED=true` o usuário local é "super_admin" do gabinete `gabinete
 2. Publique `firestore.rules` (`firebase deploy --only firestore:rules`).
 3. Configure `DATA_BACKEND=firestore`, credenciais do Admin SDK (`GOOGLE_APPLICATION_CREDENTIALS` ou ADC no Cloud Run), `SUPER_ADMIN_EMAILS` e as variáveis `VITE_FIREBASE_*`.
 4. `npm run build && npm start`, ou use o `Dockerfile`.
-5. O primeiro Super Admin cadastra o Juiz Titular de cada gabinete na tela **Gabinete → Equipe**; o Juiz cadastra assessores e estagiários.
+5. O Super Admin (e-mail em `SUPER_ADMIN_EMAILS`) cria os gabinetes em **Configurações → Super Admin**. Na tela **Equipe, lotações e avisos**, cadastra as lotações e convida o Juiz Titular pelo e-mail Google; o juiz convida assessores e estagiários. O acesso é liberado no primeiro login com o e-mail convidado.
 
 ## Estrutura
 
@@ -64,7 +64,14 @@ docs/PLANO.md               plano de desenvolvimento por fases
 | POST | `/api/chat` | minuta:refinar | Refino sobre o Resumo Executivo |
 | POST | `/api/pdf/extrair` | minuta:gerar | Extração no servidor (pdf-parse) + limpeza |
 | GET/POST | `/api/precedentes`, `/buscar`, `/importar` | precedentes:* | Repositório e importador de informativos |
-| GET/PUT | `/api/gabinete/teses`, `/paradigmas`, `/equipe` | gabinete:* | Governança do gabinete |
+| GET/PUT | `/api/gabinete/teses`, `/paradigmas`, `/prompts` | minuta:gerar (ler) · juiz (editar) | Teses, paradigmas e prompts por área |
+| GET | `/api/gabinete/unidades` | autenticado | Lotações liberadas ao usuário |
+| GET/PUT | `/api/gabinete/unidades/todas`, `/unidades/:id` | gabinete:equipe_gerenciar | Cadastro de lotações/comarcas |
+| GET/PATCH | `/api/gabinete/equipe`, `/equipe/:uid` | gabinete:equipe_gerenciar | Membros: papel, status, unidades liberadas |
+| POST/DELETE | `/api/gabinete/convites` | gabinete:equipe_gerenciar | Convite por e-mail (ativado no 1º login) |
+| PUT | `/api/gabinete/aviso` | gabinete:equipe_gerenciar | Aviso para a equipe |
+| GET | `/api/comunicados` | autenticado | Comunicado geral + aviso do gabinete |
+| GET/PUT/PATCH | `/api/admin/resumo`, `/gabinetes`, `/usuarios`, `/comunicado` | admin:tenants | Painel Super Admin |
 | GET | `/api/admin/consumo`, `/api/admin/motor` | admin:custos | Tokens e custos; cascata de IA |
 | POST | `/api/consectarios/calcular` | autenticado | Cálculo Lei 14.905/2024 |
 

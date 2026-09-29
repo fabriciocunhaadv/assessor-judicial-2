@@ -56,6 +56,16 @@ Legenda: ✅ entregue nesta base · ⏭ próxima fase
 - Conjunto de avaliação com autos anonimizados, medindo adstrição, fidelidade e extensão por modelo.
 - Testes de integração das rotas com provedores simulados; testes das regras do Firestore no emulador.
 
+## Fase 9 — Layout e configuração do gabinete ✅
+Com base nas telas do sistema anterior:
+- Barra superior com unidade judiciária ativa, prompt ativo, perfil e menu Configurações; menu lateral em "Ações principais" e "Repositório jurídico".
+- Nova Análise: prompt por área, entrada por PDF ou texto, tipo de minuta (Auto-detectar, Sentença, Decisão, Despacho, Embargos), Modo Simplificado/Avançado, guia "Como iniciar" e painel Resultado & Análise (minuta, dossiê fático, conferência).
+- Tipo de ato orienta a Etapa 2; o piso de 14 parágrafos vale só para sentença.
+- Administração do Gabinete: convite por e-mail (ativado no primeiro login), papéis, unidades liberadas por membro, lotações/comarcas e aviso à equipe.
+- Painel Super Admin: indicadores, gabinetes (criar/suspender), usuários globais (papel, gabinete, status), comunicado geral e consumo.
+- Limite de requisições separado: 300/min para navegação e 20/min para chamadas de IA.
+- Não há migração de dados: o cadastro é refeito no sistema novo.
+
 ## Migração do legado ⏭
 O sistema anterior está em `legado/` (fora do build). Funcionalidades dele que ainda não existem no sistema novo, a portar em PRs separados:
 - Mutirão Previdenciário (extração de atas e vídeos de audiência) — `legado/src/components/MutiraoPrevidenciarioView.tsx`, rotas `/api/mutirao-*` em `legado/server.ts`
@@ -64,4 +74,3 @@ O sistema anterior está em `legado/` (fora do build). Funcionalidades dele que 
 - Guia do PROJUDI, calendário de prazos do gabinete, tickets de suporte e avisos globais
 - Gerenciador de prompts personalizados, histórico e comparação de versões de minutas, painel Fato × Prova, Raio-X do processo
 - Consulta legislativa e extensão de navegador para importar autos
-- Migração de dados: ler as coleções existentes no Firestore do sistema antigo (prompts, teses, paradigmas, guias, agenda, equipe) SEM sobrescrever nada, mapeando para o layout `gabinetes/{tenant}/…` do sistema novo

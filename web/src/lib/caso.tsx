@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import type { MinutaOutput } from "../../../server/pipelines/minutePipeline";
 
 /** Processo em trabalho — compartilhado entre Esteira, Lupa, Chat e Audiência. */
 export interface Caso {
@@ -9,9 +10,11 @@ export interface Caso {
   resumoExecutivo: string;
   minuta: string;
   numeroProcesso: string;
+  /** Último resultado completo da esteira (dossiê, conferência). Só em memória. */
+  resultado: MinutaOutput | null;
 }
 
-const vazio: Caso = { nomeArquivo: "", pdfUrl: null, autos: "", paginas: 0, resumoExecutivo: "", minuta: "", numeroProcesso: "" };
+const vazio: Caso = { nomeArquivo: "", pdfUrl: null, autos: "", paginas: 0, resumoExecutivo: "", minuta: "", numeroProcesso: "", resultado: null };
 const RASCUNHO = "assessor.rascunho.v1";
 
 const Ctx = createContext<{ caso: Caso; atualizar(p: Partial<Caso>): void; novoCaso(): void } | null>(null);
@@ -20,7 +23,7 @@ export function CasoProvider({ children }: { children: ReactNode }) {
   const [caso, setCaso] = useState<Caso>(() => {
     try {
       const salvo = localStorage.getItem(RASCUNHO);
-      return salvo ? { ...vazio, ...JSON.parse(salvo), pdfUrl: null } : vazio;
+      return salvo ? { ...vazio, ...JSON.parse(salvo), pdfUrl: null, resultado: null } : vazio;
     } catch {
       return vazio;
     }
