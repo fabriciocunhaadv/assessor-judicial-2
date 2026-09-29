@@ -39,7 +39,7 @@ export default function Chat() {
       {!pronto && <p className="mb-3 text-sm text-slate-500">Gere uma minuta na Esteira primeiro — o chat trabalha sobre o Resumo Executivo e a minuta atual.</p>}
       <div className="mb-4 max-h-[60vh] space-y-4 overflow-auto">
         {historico.map((m, i) => (
-          <div key={i} className={m.role === "user" ? "ml-auto max-w-2xl rounded-lg bg-indigo-50 p-3 text-sm dark:bg-indigo-950" : "rounded-lg border border-slate-200 p-3 dark:border-slate-800"}>
+          <div key={i} className={m.role === "user" ? "ml-auto max-w-2xl rounded-lg bg-emerald-50 p-3 text-sm dark:bg-emerald-950" : "rounded-lg border border-slate-200 p-3 dark:border-slate-800"}>
             {m.role === "assistant" ? (
               <>
                 <MarkdownLite text={m.content} />

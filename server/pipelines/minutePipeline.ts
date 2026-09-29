@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { contarParagrafosDensos, verificarFidelidade } from "../../shared/fidelity.js";
+import { exigePisoDeParagrafos, REGRA_POR_ATO, type TipoAto } from "../../shared/gabinete.js";
 import { DossieFatico, MinutaFinal } from "../../shared/schemas.js";
 import { STAGE1_SYSTEM, stage1User } from "../ai/prompts/stage1AssessorFatico.js";
 import { stage2System, stage2User } from "../ai/prompts/stage2JuizRevisor.js";
@@ -16,6 +17,9 @@ const MIN_PARAGRAFOS = 14;
 
 export interface MinutaInput {
   autos: string;
+  tipoAto?: TipoAto;
+  unidadeId?: string | null;
+  promptId?: string | null;
   paradigmaId?: string | null;
   instrucao?: string;
   usarTeses?: boolean;
@@ -30,8 +34,11 @@ export interface MinutaOutput {
   verificacoes: {
     dadosNaoEncontradosNosAutos: ReturnType<typeof verificarFidelidade>;
     paragrafosDensos: number;
+    /** Piso aplicável: 14 em sentença; 0 nos demais atos. */
+    pisoParagrafos: number;
     pedidosNaoApreciados: string[];
   };
+  tipoAto: Exclude<TipoAto, "auto">;
   modelos: { etapa1: string; etapa2: string };
 }
 
@@ -72,10 +79,15 @@ export function mergeDossies(parts: DossieFatico[]): DossieFatico {
 
 export function minutaToMarkdown(m: MinutaFinal): string {
   const f = m.fundamentacao;
+  // Despachos e decisões simples chegam com blocos vazios: não geram seção vazia.
+  const fund = [f.b1_regularidade_processual, f.b2_cerne_controversia, f.b3_regime_juridico, f.b4_confronto_probatorio, f.b5_subsuncao, f.b6_julgamento_por_pedido, f.b7_consectarios_e_onus]
+    .map((b) => b.trim())
+    .filter(Boolean)
+    .join("\n\n");
   return [
     m.ementa ? `**${m.ementa}**\n` : "",
     `## RELATÓRIO\n\n${m.relatorio}`,
-    `## FUNDAMENTAÇÃO\n\n${[f.b1_regularidade_processual, f.b2_cerne_controversia, f.b3_regime_juridico, f.b4_confronto_probatorio, f.b5_subsuncao, f.b6_julgamento_por_pedido, f.b7_consectarios_e_onus].join("\n\n")}`,
+    fund ? `## FUNDAMENTAÇÃO\n\n${fund}` : "",
     `## DISPOSITIVO\n\n${m.dispositivo}`,
   ]
     .filter(Boolean)
@@ -98,19 +110,32 @@ export async function gerarMinuta(user: AuthUser, input: MinutaInput): Promise<M
   const dossie = mergeDossies(parciais.map((p) => p.data));
 
   // ── Contexto do gabinete: paradigma, teses e precedentes pertinentes ──
-  const [paradigma, teses, basePrecedentes] = await Promise.all([
+  // Tipo de ato: escolha do assessor ou, em "auto", o sugerido pela Etapa 1 a partir da fase processual.
+  const sugerido = { despacho: "despacho", decisao_interlocutoria: "decisao", saneamento: "decisao", sentenca: "sentenca", embargos_declaracao: "embargos" } as const;
+  const tipoAto: Exclude<TipoAto, "auto"> = input.tipoAto && input.tipoAto !== "auto" ? input.tipoAto : sugerido[dossie.atoSugerido];
+  const piso = exigePisoDeParagrafos(tipoAto) ? MIN_PARAGRAFOS : 0;
+
+  const [paradigma, teses, basePrecedentes, unidades, promptArea, caderno] = await Promise.all([
     input.paradigmaId ? r.paradigmas.get(user.tenantId, input.paradigmaId) : Promise.resolve(null),
     input.usarTeses === false ? Promise.resolve([]) : r.teses.listar(user.tenantId),
     r.precedentes.listar(user.tenantId),
+    input.unidadeId ? r.unidades.listar(user.tenantId) : Promise.resolve([]),
+    input.promptId ? r.prompts.get(user.tenantId, input.promptId) : Promise.resolve(null),
+    input.usarTeses === false ? Promise.resolve(null) : r.caderno.get(user.tenantId),
   ]);
+  const unidade = unidades.find((u) => u.id === input.unidadeId) ?? null;
   const tema = [...dossie.pedidos.map((p) => p.descricao), ...dossie.pontosControvertidos, dossie.classe].join(" ");
   const precedentes = rankPrecedentes(tema, basePrecedentes);
 
   // ── ETAPA 2: Juiz Revisor / Redator Magistral ──
   const s2Schema = schemaText(MinutaFinal);
   const system = stage2System({
+    regraDoAto: REGRA_POR_ATO[tipoAto],
+    unidade,
+    promptArea: promptArea?.ativo === false ? null : promptArea,
     paradigma,
     teses: teses.filter((t) => t.ativa),
+    caderno: caderno?.texto,
     precedentes,
     instrucaoDoAssessor: input.instrucao,
   });
@@ -123,7 +148,7 @@ export async function gerarMinuta(user: AuthUser, input: MinutaInput): Promise<M
 
   // Piso de extensão: uma rodada de aprofundamento se a fundamentação vier telegráfica.
   const fundamentacaoTexto = () => Object.values(etapa2.data.fundamentacao).join("\n\n");
-  if (contarParagrafosDensos(fundamentacaoTexto()) < MIN_PARAGRAFOS) {
+  if (piso && contarParagrafosDensos(fundamentacaoTexto()) < piso) {
     etapa2 = await generateValidated(user, "minuta", MinutaFinal, {
       system,
       messages: [
@@ -151,8 +176,10 @@ export async function gerarMinuta(user: AuthUser, input: MinutaInput): Promise<M
     verificacoes: {
       dadosNaoEncontradosNosAutos: verificarFidelidade(markdown, input.autos),
       paragrafosDensos: contarParagrafosDensos(fundamentacaoTexto()),
+      pisoParagrafos: piso,
       pedidosNaoApreciados,
     },
+    tipoAto,
     modelos: { etapa1: parciais.map((p) => p.result.model).join(", "), etapa2: etapa2.result.model },
   };
 

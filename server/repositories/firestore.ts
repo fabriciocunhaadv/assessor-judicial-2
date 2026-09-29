@@ -9,6 +9,13 @@ import type { Repositorio } from "./types.js";
  *   gabinetes/{tenantId}/precedentes/{id}
  *   gabinetes/{tenantId}/minutas/{id}
  *   usage_logs/{auto}
+ *   invites/{email}                             convites pendentes
+ *   tenants/{tenantId}                          gabinetes (Super Admin)
+ *   gabinetes/{tenantId}/unidades/{id}          lotações
+ *   gabinetes/{tenantId}/prompts/{id}           (+ /historico/{ts})
+ *   config/comunicado, gabinetes/{tenantId}/config/comunicado
+ *   gabinetes/{tenantId}/config/caderno         (+ /historico/{ts})
+ *   gabinetes/{tenantId}/auditorias/{id}
  * Todas as escritas usam { merge: true }. Nenhuma rotina de seed.
  */
 export function createFirestoreRepo(db: Firestore): Repositorio {
@@ -27,7 +34,40 @@ export function createFirestoreRepo(db: Firestore): Repositorio {
     usuarios: {
       async get(uid) { const s = await db.collection("users").doc(uid).get(); return s.exists ? (s.data() as any) : null; },
       async listarDoGabinete(t) { const q = await db.collection("users").where("tenantId", "==", t).get(); return q.docs.map((d) => d.data() as any); },
+      async listarTodos() { const q = await db.collection("users").get(); return q.docs.map((d) => d.data() as any); },
       async salvar(u) { await db.collection("users").doc(u.uid).set(u, { merge: true }); },
+    },
+    convites: {
+      async get(e) { const s = await db.collection("invites").doc(e.toLowerCase()).get(); return s.exists ? (s.data() as any) : null; },
+      async listarDoGabinete(t) { const q = await db.collection("invites").where("tenantId", "==", t).get(); return q.docs.map((d) => d.data() as any); },
+      async salvar(c) { await db.collection("invites").doc(c.email.toLowerCase()).set({ ...c, email: c.email.toLowerCase() }, { merge: true }); },
+      async remover(e) { await db.collection("invites").doc(e.toLowerCase()).delete(); },
+    },
+    unidades: {
+      async listar(t) { const q = await gab(t).collection("unidades").get(); return q.docs.map((d) => d.data() as any); },
+      async salvar(t, x) { await gab(t).collection("unidades").doc(x.id).set(x, { merge: true }); },
+    },
+    prompts: {
+      async listar(t) { const q = await gab(t).collection("prompts").get(); return q.docs.map((d) => d.data() as any); },
+      async get(t, id) { const s = await gab(t).collection("prompts").doc(id).get(); return s.exists ? (s.data() as any) : null; },
+      async salvar(t, x) { await salvarComHistorico(gab(t).collection("prompts"), x.id, x); },
+    },
+    gabinetes: {
+      async listar() { const q = await db.collection("tenants").get(); return q.docs.map((d) => d.data() as any); },
+      async get(id) { const s = await db.collection("tenants").doc(id).get(); return s.exists ? (s.data() as any) : null; },
+      async salvar(g) { await db.collection("tenants").doc(g.id).set(g, { merge: true }); },
+    },
+    caderno: {
+      async get(t) { const s = await gab(t).collection("config").doc("caderno").get(); return s.exists ? (s.data() as any) : null; },
+      async salvar(t, c) { await salvarComHistorico(gab(t).collection("config"), "caderno", c); },
+    },
+    auditorias: {
+      async registrar(t, a) { await gab(t).collection("auditorias").doc(a.id).set(a, { merge: true }); },
+      async listar(t, limite = 50) { const q = await gab(t).collection("auditorias").orderBy("criadoEm", "desc").limit(limite).get(); return q.docs.map((d) => d.data() as any); },
+    },
+    comunicados: {
+      async get(t) { const ref = t ? gab(t).collection("config").doc("comunicado") : db.collection("config").doc("comunicado"); const s = await ref.get(); return s.exists ? (s.data() as any) : null; },
+      async salvar(t, c) { const ref = t ? gab(t).collection("config").doc("comunicado") : db.collection("config").doc("comunicado"); await ref.set(c, { merge: true }); },
     },
     teses: {
       async listar(t) { const q = await gab(t).collection("teses").get(); return q.docs.map((d) => d.data() as any); },
@@ -53,6 +93,7 @@ export function createFirestoreRepo(db: Firestore): Repositorio {
     minutas: {
       async registrar(t, r) { await gab(t).collection("minutas").doc(r.id).set(r, { merge: true }); },
       async listar(t, limite = 50) { const q = await gab(t).collection("minutas").orderBy("criadoEm", "desc").limit(limite).get(); return q.docs.map((d) => d.data() as any); },
+      async contar(t) { const q = t ? gab(t).collection("minutas") : db.collectionGroup("minutas"); const s = await q.count().get(); return s.data().count; },
     },
     uso: {
       async registrar(r) { await db.collection("usage_logs").add(r); },

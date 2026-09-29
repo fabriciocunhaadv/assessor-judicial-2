@@ -1,8 +1,14 @@
 import { REGRAS_INEGOCIAVEIS } from "./base.js";
 
 export interface Stage2Contexto {
+  /** Regra de estrutura do ato a redigir (de shared/gabinete.ts). */
+  regraDoAto: string;
+  unidade?: { nome: string; comarca: string; competencia: string } | null;
+  promptArea?: { titulo: string; area: string; texto: string } | null;
   paradigma?: { titulo: string; texto: string } | null;
   teses: { titulo: string; texto: string }[];
+  /** Caderno de Teses do gabinete em texto corrido. */
+  caderno?: string;
   precedentes: { identificador: string; tribunal: string; enunciado: string }[];
   instrucaoDoAssessor?: string;
 }
@@ -25,8 +31,22 @@ ESTRUTURA OBRIGATÓRIA
    B7 Consectários e ônus da sucumbência.
 3. Dispositivo: resolva cada pedido. Liquide os consectários conforme a Lei nº 14.905/2024 — correção monetária pelo IPCA (art. 389, parágrafo único, do CC) e juros de mora pela taxa legal (Selic deduzido o IPCA, art. 406, §§ 1º e 3º, do CC), indicando os termos iniciais (Súmulas 43, 54 e 362 do STJ, quando cabíveis). Em Juizado Especial, observe os arts. 54 e 55 da Lei nº 9.099/95.
 
-EXTENSÃO: proibida minuta telegráfica. A fundamentação deve ter no mínimo 14 parágrafos densos (em regra 14 a 20 ou mais), proporcionais à complexidade.
-SAÍDA: um único objeto JSON conforme o schema informado.`;
+EXTENSÃO: proibida minuta telegráfica. Em sentença, a fundamentação deve ter no mínimo 14 parágrafos densos (em regra 14 a 20 ou mais), proporcionais à complexidade.
+SAÍDA: um único objeto JSON conforme o schema informado.
+
+ATO A REDIGIR: ${ctx.regraDoAto}`;
+
+  if (ctx.unidade) {
+    s += `
+
+UNIDADE JUDICIÁRIA: ${ctx.unidade.nome} — Comarca de ${ctx.unidade.comarca} (${ctx.unidade.competencia}). Observe o rito e as normas próprias dessa competência.`;
+  }
+  if (ctx.promptArea?.texto) {
+    s += `
+
+INSTRUÇÕES DO GABINETE PARA A ÁREA "${ctx.promptArea.area}" (${ctx.promptArea.titulo.replace(/"/g, "'")}) — aplique-as, respeitadas as regras inegociáveis:
+${ctx.promptArea.texto}`;
+  }
 
   if (ctx.paradigma?.texto) {
     s += `
@@ -36,6 +56,14 @@ Reproduza rigorosamente o estilo, a ordem dos tópicos, a capitulação, os tít
 <paradigma titulo="${ctx.paradigma.titulo.replace(/"/g, "'")}">
 ${ctx.paradigma.texto}
 </paradigma>`;
+  }
+  if (ctx.caderno?.trim()) {
+    s += `
+
+CADERNO DE TESES DO GABINETE (regras gerais do juízo, de observância obrigatória quando o caso se enquadrar):
+<caderno>
+${ctx.caderno.trim()}
+</caderno>`;
   }
   if (ctx.teses.length) {
     s += `

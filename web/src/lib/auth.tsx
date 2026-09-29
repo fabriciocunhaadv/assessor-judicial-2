@@ -10,6 +10,8 @@ export interface Perfil {
   nome: string;
   role: Role;
   tenantId: string;
+  gabineteNome: string;
+  unidadesLiberadas: string[];
   permissoes: Permission[];
 }
 
