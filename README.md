@@ -67,6 +67,8 @@ docs/PLANO.md               plano de desenvolvimento por fases
 | GET/POST | `/api/precedentes`, `/buscar`, `/importar` | precedentes:* | Repositório e importador de informativos |
 | GET/PUT | `/api/gabinete/teses`, `/paradigmas`, `/prompts` | minuta:gerar (ler) · juiz (editar) | Teses, paradigmas e prompts por área |
 | GET/PUT | `/api/gabinete/caderno` | minuta:gerar (ler) · juiz (editar) | Caderno de Teses em texto corrido (entra em todas as minutas) |
+| GET/PUT | `/api/gabinete/documentos/:chave` | ler: todos · editar: juiz | Guia do PROJUDI (`guia_projudi`) e Google Agenda vinculado (`agenda_config`) |
+| GET/PUT/DELETE | `/api/agenda` | minuta:gerar | Prazos, audiências e diligências do gabinete |
 | GET | `/api/gabinete/unidades` | autenticado | Lotações liberadas ao usuário |
 | GET/PUT | `/api/gabinete/unidades/todas`, `/unidades/:id` | gabinete:equipe_gerenciar | Cadastro de lotações/comarcas |
 | GET/PATCH | `/api/gabinete/equipe`, `/equipe/:uid` | gabinete:equipe_gerenciar | Membros: papel, status, unidades liberadas |

@@ -6,6 +6,7 @@ import { errorHandler } from "./middleware/errorHandler.js";
 import { rateLimit } from "./middleware/rateLimit.js";
 import { requireAuth } from "./middleware/requireAuth.js";
 import { adminRouter } from "./routes/admin.js";
+import { agendaRouter } from "./routes/agenda.js";
 import { audienciaRouter } from "./routes/audiencia.js";
 import { chatRouter } from "./routes/chat.js";
 import { gabineteRouter } from "./routes/gabinete.js";
@@ -35,6 +36,7 @@ export function createApp() {
   app.use("/api/pdf", pdfRouter);
   app.use("/api/precedentes", (req, res, next) => (req.path.startsWith("/importar") ? limiteIA(req, res, next) : next()), precedentesRouter);
   app.use("/api/gabinete", gabineteRouter);
+  app.use("/api/agenda", agendaRouter);
   app.use("/api/admin", adminRouter);
 
   if (env.isProd) {

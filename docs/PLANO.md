@@ -72,14 +72,22 @@ Com base nas telas do sistema anterior:
 - Nova Análise: card de Minuta Paradigma com prévia e "Ativo no prompt", co-piloto "Controle total da decisão" e status do caderno e da consulta vinculante.
 - Não há migração de dados: o cadastro é refeito no sistema novo.
 
+## Fase 10 — Agenda, Guia do PROJUDI, Word e Manual ✅
+- Exportação da minuta em Word (.docx) no padrão forense (`shared/minutaDocx.ts`), carregada sob demanda.
+- Agenda do gabinete (prazos, audiências, diligências) com calendário mensal e Google Agenda opcional.
+- Calculadora de prazos em dias úteis (`shared/prazos.ts`): CPC arts. 219, 220 e 224, feriados nacionais fixos e datas sem expediente informadas pelo usuário.
+- Guia do PROJUDI do gabinete (documento com histórico; começa vazio, sem conteúdo pré-carregado).
+- Manual de uso com registro de mudanças (`web/src/lib/changelog.ts` — acrescentar uma entrada a cada entrega).
+- Testes de API por HTTP (`tests/api.test.ts`).
+
 ## Migração do legado ⏭
 O sistema anterior está em `legado/` (fora do build). Funcionalidades dele que ainda não existem no sistema novo, a portar em PRs separados:
 - Mutirão Previdenciário (extração de atas e vídeos de audiência) — `legado/src/components/MutiraoPrevidenciarioView.tsx`, rotas `/api/mutirao-*` em `legado/server.ts`
 - Petições iniciais para advogados — `legado/server/petitionAdvogadoRoutes.ts`, `InitialPetitionPanel.tsx`
-- Manual do Sistema e Tour Guiado — `SystemManualModal.tsx`, `SystemTour.tsx` (regra do AGENTS.md antigo: atualizar a cada entrega)
+- Tour guiado interativo — `SystemTour.tsx` (o Manual já existe em /ajuda)
 - Guia do PROJUDI, calendário de prazos do gabinete, tickets de suporte e avisos globais
 - Gerenciador de prompts personalizados, histórico e comparação de versões de minutas, painel Fato × Prova, Raio-X do processo
 - Pesquisa legislativa com IA (o catálogo estático de regimes já existe), sincronização semanal automática de informativos e pesquisa ao vivo (grounding)
 - Base de conhecimento do gabinete, "Mapear PDFs" e varredura automática para sugerir teses
-- Guia do PROJUDI, Agenda de prazos, "Conheça o Assessor" e "Raio X da Lotação"
+- "Conheça o Assessor" e "Raio X da Lotação"
 - Extensão de navegador para importar autos

@@ -58,6 +58,22 @@ export interface Caderno {
   atualizadoEm: number;
 }
 
+/** Compromisso da agenda do gabinete (prazo, audiência, diligência). */
+export interface EventoAgenda {
+  id: string;
+  titulo: string;
+  tipo: "prazo" | "audiencia" | "diligencia" | "outro";
+  data: string; // AAAA-MM-DD
+  hora: string; // HH:MM ou ""
+  processo: string;
+  responsavel: string;
+  unidadeId: string;
+  observacao: string;
+  concluido: boolean;
+  criadoPor: string;
+  criadoEm: number;
+}
+
 export interface RegistroAuditoria {
   id: string;
   numeroProcesso: string;
@@ -161,6 +177,17 @@ export interface Repositorio {
   caderno: {
     get(tenantId: string): Promise<Caderno | null>;
     salvar(tenantId: string, c: Caderno): Promise<void>;
+  };
+  /** Documentos de texto do gabinete por chave (ex.: guia_projudi, agenda_config). */
+  documentos: {
+    get(tenantId: string, chave: string): Promise<Caderno | null>;
+    salvar(tenantId: string, chave: string, c: Caderno): Promise<void>;
+  };
+  agenda: {
+    listar(tenantId: string, de: string, ate: string): Promise<EventoAgenda[]>;
+    get(tenantId: string, id: string): Promise<EventoAgenda | null>;
+    salvar(tenantId: string, e: EventoAgenda): Promise<void>;
+    remover(tenantId: string, id: string): Promise<void>;
   };
   auditorias: {
     registrar(tenantId: string, a: RegistroAuditoria): Promise<void>;
