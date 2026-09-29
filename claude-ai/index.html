@@ -1,0 +1,317 @@
+<title>Assessor Judicial IA</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&display=swap">
+<style>
+/* Layout: barra do gabinete no topo + abas; cada aba é uma bancada de trabalho em grade que colapsa para uma coluna no celular. */
+:root {
+  --bg: #F3F5F7; --surface: #FFFFFF; --sunk: #EBEFF3; --ink: #15202B; --muted: #566472; --line: #D5DCE3;
+  --accent: #1B4F6E; --accent-ink: #FFFFFF; --accent-soft: #E1ECF3;
+  --ref: #7A5410; --ref-soft: #F6ECD8;
+  --ok: #1D6B45; --ok-soft: #DDF1E6; --warn: #8A5A06; --warn-soft: #F8EBCF; --bad: #A8261B; --bad-soft: #F9E0DD;
+  --f-ui: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-doc: "Source Serif 4", Georgia, "Times New Roman", serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Consolas, monospace;
+  --r: 8px;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0E141A; --surface: #151D25; --sunk: #1B2530; --ink: #E4EAF0; --muted: #98A6B3; --line: #2A3743;
+  --accent: #86B9DA; --accent-ink: #0E141A; --accent-soft: #1C3242;
+  --ref: #E0B35E; --ref-soft: #3A2E17;
+  --ok: #6CCB98; --ok-soft: #173627; --warn: #E0B35E; --warn-soft: #3A2E17; --bad: #F08C80; --bad-soft: #3D1D1A;
+  color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg: #0E141A; --surface: #151D25; --sunk: #1B2530; --ink: #E4EAF0; --muted: #98A6B3; --line: #2A3743;
+  --accent: #86B9DA; --accent-ink: #0E141A; --accent-soft: #1C3242;
+  --ref: #E0B35E; --ref-soft: #3A2E17;
+  --ok: #6CCB98; --ok-soft: #173627; --warn: #E0B35E; --warn-soft: #3A2E17; --bad: #F08C80; --bad-soft: #3D1D1A;
+  color-scheme: dark; }
+
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font: 14px/1.5 var(--f-ui); }
+.wrap { max-width: 1480px; margin: 0 auto; padding-inline: 16px; padding-block: 0 32px; }
+h1, h2, h3 { text-wrap: balance; margin: 0; }
+button, input, select, textarea { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.top { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--surface); border-bottom: 1px solid var(--line); }
+.top .wrap { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 20px; padding-block: 10px; }
+.brand { display: flex; align-items: baseline; gap: 10px; }
+.brand h1 { font: 700 18px/1.2 var(--f-doc); letter-spacing: .01em; }
+.brand small { color: var(--muted); font-size: 12px; }
+.status { display: flex; flex-wrap: wrap; gap: 6px; margin-left: auto; }
+nav.tabs { display: flex; flex-wrap: wrap; gap: 2px; width: 100%; }
+nav.tabs button { border: 0; background: none; padding: 8px 12px; border-radius: 6px 6px 0 0; color: var(--muted); cursor: pointer; border-bottom: 2px solid transparent; font-weight: 500; }
+nav.tabs button[aria-selected="true"] { color: var(--accent); border-bottom-color: var(--accent); }
+nav.tabs button:hover { color: var(--ink); }
+
+.pill { display: inline-flex; align-items: center; gap: 6px; padding: 2px 9px; border-radius: 999px; font-size: 12px; background: var(--sunk); color: var(--muted); white-space: nowrap; }
+.pill::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; opacity: .8; }
+.pill.ok { background: var(--ok-soft); color: var(--ok); } .pill.warn { background: var(--warn-soft); color: var(--warn); } .pill.bad { background: var(--bad-soft); color: var(--bad); }
+.tag { display: inline-block; padding: 1px 7px; border-radius: 4px; font: 500 11px/1.6 var(--f-mono); background: var(--sunk); color: var(--muted); }
+
+main section[role="tabpanel"] { padding-top: 16px; }
+.grid { display: grid; gap: 16px; align-items: start; }
+.g-side { grid-template-columns: minmax(0, 360px) minmax(0, 1fr); }
+.g-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.g-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (max-width: 1100px) { .g-3 { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 860px) { .g-side, .g-2 { grid-template-columns: minmax(0, 1fr); } }
+
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); min-width: 0; }
+.panel > header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 14px; border-bottom: 1px solid var(--line); }
+.panel > header h2 { font-size: 13px; font-weight: 600; letter-spacing: .02em; }
+.panel > .body { padding: 14px; display: grid; gap: 12px; min-width: 0; }
+.stack { display: grid; gap: 16px; }
+.muted { color: var(--muted); } .small { font-size: 12.5px; }
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+
+label.f { display: grid; gap: 4px; font-size: 12.5px; color: var(--muted); }
+input[type=text], input[type=number], select, textarea { width: 100%; background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; color: var(--ink); }
+textarea { resize: vertical; line-height: 1.5; }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; border-radius: 6px; padding: 8px 14px; border: 1px solid var(--accent); background: var(--accent); color: var(--accent-ink); font-weight: 500; cursor: pointer; }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+.btn.ghost { background: transparent; color: var(--accent); }
+.btn.quiet { background: transparent; border-color: var(--line); color: var(--ink); }
+.btn.danger { background: transparent; border-color: var(--bad); color: var(--bad); }
+.btn.sm { padding: 4px 10px; font-size: 12.5px; }
+
+.drop { display: grid; place-items: center; gap: 6px; text-align: center; padding: 22px 14px; border: 1.5px dashed var(--line); border-radius: var(--r); background: var(--sunk); cursor: pointer; }
+.drop:hover, .drop.over { border-color: var(--accent); }
+.drop strong { font-weight: 600; }
+.bar { height: 4px; border-radius: 2px; background: var(--sunk); overflow: hidden; } .bar > i { display: block; height: 100%; background: var(--accent); width: 0; transition: width .2s; }
+
+.steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; font-size: 13px; }
+.steps li { display: grid; grid-template-columns: 18px 1fr; gap: 8px; color: var(--muted); }
+.steps li::before { content: "○"; color: var(--line); }
+.steps li.run { color: var(--ink); } .steps li.run::before { content: "◐"; color: var(--accent); }
+.steps li.done::before { content: "●"; color: var(--ok); } .steps li.fail::before { content: "●"; color: var(--bad); }
+
+.checks { display: grid; gap: 6px; }
+.check { display: flex; justify-content: space-between; gap: 8px; align-items: center; font-size: 13px; }
+.notes { font-size: 12.5px; display: grid; gap: 3px; } .notes .bad { color: var(--bad); } .notes .warn { color: var(--warn); }
+.err { padding: 10px 12px; border-radius: 6px; background: var(--bad-soft); color: var(--bad); font-size: 13px; }
+.info { padding: 10px 12px; border-radius: 6px; background: var(--accent-soft); color: var(--ink); font-size: 13px; }
+.warnbox { padding: 10px 12px; border-radius: 6px; background: var(--warn-soft); color: var(--ink); font-size: 13px; }
+
+/* Folha da minuta */
+.folha { font: 16px/1.72 var(--f-doc); color: var(--ink); max-width: 72ch; margin: 0 auto; overflow-wrap: anywhere; }
+.folha h2 { font: 700 15px/1.4 var(--f-doc); text-transform: uppercase; letter-spacing: .06em; text-align: center; margin: 28px 0 12px; }
+.folha h3 { font: 600 16px/1.4 var(--f-doc); margin: 20px 0 8px; }
+.folha h1 { font: 700 18px/1.4 var(--f-doc); margin: 0 0 12px; }
+.folha p { margin: 0 0 12px; text-align: justify; hyphens: auto; }
+.folha p.cit { margin-left: 4ch; font-size: 15px; font-style: italic; }
+.folha ul { margin: 0 0 12px; padding-left: 22px; }
+.ref { font: 500 .78em/1 var(--f-mono); background: var(--ref-soft); color: var(--ref); padding: 1px 3px; border-radius: 3px; white-space: nowrap; }
+button.ref { border: 0; cursor: pointer; }
+.pid { font: 600 .78em/1 var(--f-mono); color: var(--accent); }
+.placeholder { color: var(--muted); font-size: 14px; display: grid; gap: 8px; max-width: 60ch; }
+.scroll { max-height: 72vh; overflow: auto; }
+
+/* Lupa */
+.pdfbox { background: var(--sunk); border-radius: 6px; min-height: 300px; display: grid; place-items: center; overflow: auto; max-height: 70vh; }
+.pdfbox canvas { max-width: 100%; height: auto; display: block; box-shadow: 0 1px 3px rgb(0 0 0 / .15); }
+.pdfbox pre { white-space: pre-wrap; font: 13px/1.55 var(--f-doc); padding: 14px; margin: 0; align-self: start; width: 100%; }
+.hits { display: grid; gap: 4px; max-height: 160px; overflow: auto; font-size: 12.5px; }
+.hits button { text-align: left; background: none; border: 0; padding: 4px 6px; border-radius: 4px; cursor: pointer; color: var(--ink); }
+.hits button:hover { background: var(--sunk); }
+mark { background: var(--ref-soft); color: var(--ink); }
+.editor { min-height: 60vh; font: 14.5px/1.65 var(--f-doc); }
+.score { font: 700 28px/1 var(--f-doc); }
+.list-ol { margin: 0; padding-left: 20px; display: grid; gap: 4px; font-size: 13.5px; }
+.sec h3 { font-size: 13px; font-weight: 600; margin-bottom: 4px; display: flex; gap: 8px; align-items: center; }
+
+/* Chat */
+.msgs { display: grid; gap: 12px; max-height: 62vh; overflow: auto; padding-right: 4px; }
+.msg { overflow-wrap: anywhere; min-width: 0; }
+.msg.user { justify-self: end; max-width: 80%; background: var(--accent-soft); padding: 8px 12px; border-radius: 10px 10px 2px 10px; }
+.msg.bot { border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; }
+
+/* Tabelas e listas do gabinete */
+.items { display: grid; gap: 8px; }
+.item { border: 1px solid var(--line); border-radius: 6px; padding: 10px 12px; display: grid; gap: 6px; }
+.item .row { justify-content: space-between; }
+.item p { margin: 0; font-size: 13.5px; }
+.tbl { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 13px; font-variant-numeric: tabular-nums; }
+th, td { padding: 6px 8px; border-bottom: 1px solid var(--line); text-align: right; white-space: nowrap; }
+th:first-child, td:first-child { text-align: left; }
+.num { font-variant-numeric: tabular-nums; }
+.chip-inj { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 6px; background: var(--ref-soft); color: var(--ref); font-size: 12.5px; }
+@media (max-width: 860px) { .top { position: static; } .brand small { display: none; } }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+
+<header class="top">
+  <div class="wrap">
+    <div class="brand"><h1>Assessor Judicial IA</h1><small>Gabinete · minutas, conferência e audiência</small></div>
+    <div class="status" id="status">
+      <span class="pill" id="st-claude">Claude: conectando…</span>
+      <span class="pill" id="st-db">Dados do gabinete: conectando…</span>
+      <span class="pill" id="st-role" hidden></span>
+    </div>
+    <nav class="tabs" role="tablist" aria-label="Módulos">
+      <button role="tab" id="t-esteira" aria-controls="esteira" aria-selected="true">Esteira de Minutas</button>
+      <button role="tab" id="t-lupa" aria-controls="lupa" aria-selected="false">Lupa do Magistrado</button>
+      <button role="tab" id="t-audiencia" aria-controls="audiencia" aria-selected="false">Mesa de Audiência</button>
+      <button role="tab" id="t-chat" aria-controls="chat" aria-selected="false">Chat &amp; Refino</button>
+      <button role="tab" id="t-precedentes" aria-controls="precedentes" aria-selected="false">Precedentes</button>
+      <button role="tab" id="t-gabinete" aria-controls="gabinete" aria-selected="false">Gabinete</button>
+      <button role="tab" id="t-historico" aria-controls="historico" aria-selected="false">Histórico</button>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <!-- ESTEIRA -->
+  <section role="tabpanel" id="esteira" aria-labelledby="t-esteira">
+    <div class="grid g-side">
+      <div class="stack">
+        <div class="panel"><header><h2>1 · Autos processuais</h2></header><div class="body">
+          <label class="drop" id="drop" for="f-autos">
+            <strong id="drop-t">Selecione os autos em PDF</strong>
+            <span class="muted small" id="drop-s">Projudi, PJe ou eproc. O texto é lido e limpo aqui no navegador.</span>
+            <input type="file" id="f-autos" accept="application/pdf" hidden>
+          </label>
+          <div class="bar" id="leitura-bar" hidden><i></i></div>
+          <button class="btn quiet sm" id="b-exemplo" type="button">Carregar autos de exemplo (fictícios)</button>
+          <div id="leitura-err"></div>
+        </div></div>
+        <div class="panel"><header><h2>2 · Parâmetros do gabinete</h2></header><div class="body">
+          <label class="f" for="s-paradigma">Minuta Paradigma (espelho estrutural)
+            <select id="s-paradigma"><option value="">Sem paradigma</option></select>
+          </label>
+          <label class="row small" for="c-teses"><input type="checkbox" id="c-teses" checked> Aplicar o Caderno de Teses do Gabinete</label>
+          <label class="f" for="t-instrucao">Orientação para este caso (opcional)
+            <textarea id="t-instrucao" rows="3" placeholder="Ex.: examinar a impugnação da assinatura do contrato (Tema 1.061/STJ)."></textarea>
+          </label>
+          <div class="row"><button class="btn" id="b-gerar" type="button" disabled>Gerar minuta em 2 etapas</button><button class="btn danger" id="b-parar" type="button" hidden>Parar</button></div>
+          <ol class="steps" id="steps" hidden>
+            <li data-s="1">Etapa 1 — Assessor Fático extrai cronologia, pedidos e provas</li>
+            <li data-s="2">Etapa 2 — Juiz Revisor redige a minuta</li>
+            <li data-s="3">Conferência automática</li>
+          </ol>
+          <div id="gerar-err"></div>
+        </div></div>
+        <div class="panel" id="p-checks" hidden><header><h2>Conferência automática</h2></header><div class="body">
+          <div class="checks" id="checks"></div><div class="notes" id="check-notes"></div>
+          <div class="row" id="check-actions"></div>
+        </div></div>
+      </div>
+      <div class="panel"><header><h2 id="minuta-h">Minuta</h2><div class="row" id="minuta-actions"></div></header>
+        <div class="body"><div id="minuta" class="folha"></div></div></div>
+    </div>
+  </section>
+
+  <!-- LUPA -->
+  <section role="tabpanel" id="lupa" aria-labelledby="t-lupa" hidden>
+    <div class="grid g-3">
+      <div class="panel"><header><h2>1 · Autos</h2><div class="row"><button class="btn quiet sm" id="pg-prev" type="button" aria-label="Página anterior">‹</button><span class="small num" id="pg-info">—</span><button class="btn quiet sm" id="pg-next" type="button" aria-label="Próxima página">›</button></div></header>
+        <div class="body"><input type="text" id="busca" placeholder="Buscar nos autos (mín. 3 letras)"><div class="hits" id="hits"></div><div class="pdfbox" id="pdfbox"><span class="muted small">Carregue os autos na Esteira de Minutas.</span></div></div></div>
+      <div class="panel"><header><h2>2 · Minuta do assessor</h2><button class="btn sm" id="b-auditar" type="button" disabled>Auditar</button></header>
+        <div class="body"><textarea id="editor" class="editor" placeholder="Cole aqui a minuta a conferir, ou gere uma na Esteira."></textarea><div id="lupa-err"></div></div></div>
+      <div class="panel"><header><h2>3 · Diagnóstico</h2><span id="nota"></span></header><div class="body scroll" id="diag">
+        <div class="placeholder"><p>A Matriz de Conformidade confere adstrição aos pedidos (extra, ultra e citra petita), dados sem lastro nos autos, precedentes vinculantes e consectários da Lei nº 14.905/2024.</p><p>Depois da auditoria, gere a minuta gabarito com as correções.</p></div>
+      </div></div>
+    </div>
+  </section>
+
+  <!-- AUDIÊNCIA -->
+  <section role="tabpanel" id="audiencia" aria-labelledby="t-audiencia" hidden>
+    <div class="grid g-2">
+      <div class="panel"><header><h2>Resumo da lide — 5 pilares</h2><button class="btn sm" id="b-painel" type="button" disabled>Preparar audiência</button></header><div class="body">
+        <label class="f" for="i-part">Participantes previstos (separe por ponto e vírgula)<input type="text" id="i-part" placeholder="Testemunha do autor: João; Preposto do réu"></label>
+        <div id="painel"><p class="muted small">Usa o Resumo Executivo do processo aberto na Esteira.</p></div>
+      </div></div>
+      <div class="panel"><header><h2>Redator de termo</h2></header><div class="body">
+        <label class="f" for="s-tipo">Tipo<select id="s-tipo"><option>audiência de instrução</option><option>audiência de conciliação</option><option>homologação de acordo</option></select></label>
+        <label class="f" for="t-anot">Anotações<textarea id="t-anot" rows="7" placeholder="Presentes, ocorrências, proposta aceita (valor, parcelas, vencimentos, multa)…"></textarea></label>
+        <button class="btn" id="b-termo" type="button">Redigir termo</button>
+        <div id="termo"></div>
+      </div></div>
+    </div>
+  </section>
+
+  <!-- CHAT -->
+  <section role="tabpanel" id="chat" aria-labelledby="t-chat" hidden>
+    <div class="panel"><header><h2>Chat de refino jurídico</h2><span class="muted small">Envia o Resumo Executivo e a minuta atual, não os autos inteiros.</span></header><div class="body">
+      <div class="msgs" id="msgs"><p class="muted small" id="chat-vazio">Gere uma minuta na Esteira. Depois peça ajustes como “converta para improcedência” ou “aprecie a tutela de urgência”.</p></div>
+      <div class="row" style="align-items:stretch"><textarea id="t-msg" rows="2" style="flex:1;min-width:0" placeholder="Pedido de alteração (Ctrl+Enter envia)"></textarea><button class="btn" id="b-enviar" type="button" disabled>Enviar</button></div>
+      <div id="chat-err"></div>
+    </div></div>
+  </section>
+
+  <!-- PRECEDENTES -->
+  <section role="tabpanel" id="precedentes" aria-labelledby="t-precedentes" hidden>
+    <div class="panel"><header><h2 id="prec-h">Repositório vinculante</h2>
+      <label class="btn sm" id="l-importar" for="f-prec">Importar PDF de informativo<input type="file" id="f-prec" accept="application/pdf" hidden></label></header>
+      <div class="body">
+        <div class="row" id="filtros"></div>
+        <input type="text" id="prec-q" placeholder="Buscar por tema, número ou palavra-chave">
+        <div id="prec-status"></div>
+        <div class="items" id="prec-list"></div>
+      </div></div>
+  </section>
+
+  <!-- GABINETE -->
+  <section role="tabpanel" id="gabinete" aria-labelledby="t-gabinete" hidden>
+    <div class="grid g-2">
+      <div class="panel"><header><h2>Minutas Paradigma</h2></header><div class="body">
+        <div class="items" id="par-list"></div>
+        <form id="par-form" class="stack" hidden>
+          <label class="f" for="par-titulo">Título<input type="text" id="par-titulo" required placeholder="Sentença JEC — dano moral bancário"></label>
+          <label class="f" for="par-tipo">Tipo de ato<input type="text" id="par-tipo" value="Sentença"></label>
+          <label class="f" for="par-texto">Íntegra de uma decisão anterior do magistrado<textarea id="par-texto" rows="7" required placeholder="O estilo, a ordem dos tópicos e o formato do dispositivo serão clonados."></textarea></label>
+          <button class="btn" type="submit">Adicionar paradigma</button>
+        </form>
+        <p class="muted small" id="par-ro" hidden>Só Juiz(a) Titular e Editores alteram paradigmas.</p>
+      </div></div>
+      <div class="panel"><header><h2>Caderno de Teses</h2></header><div class="body">
+        <div class="items" id="tes-list"></div>
+        <form id="tes-form" class="stack" hidden>
+          <label class="f" for="tes-titulo">Título<input type="text" id="tes-titulo" required></label>
+          <label class="f" for="tes-texto">Entendimento do juízo<textarea id="tes-texto" rows="4" required></textarea></label>
+          <button class="btn" type="submit">Adicionar tese</button>
+        </form>
+        <p class="muted small" id="tes-ro" hidden>Só Juiz(a) Titular e Editores alteram o Caderno de Teses.</p>
+      </div></div>
+      <div class="panel"><header><h2>Consectários — Lei nº 14.905/2024</h2></header><div class="body">
+        <p class="muted small">Correção pelo IPCA e juros pela taxa legal (Selic − IPCA, nunca negativa). Informe os índices mensais oficiais; nada é estimado.</p>
+        <div class="grid g-2">
+          <label class="f" for="cx-p">Principal (R$)<input type="number" id="cx-p" step="0.01" value="10000"></label>
+          <label class="f" for="cx-fim">Competência final<input type="text" id="cx-fim" value="2025-03" placeholder="AAAA-MM"></label>
+          <label class="f" for="cx-c">Início da correção<input type="text" id="cx-c" value="2025-01" placeholder="AAAA-MM"></label>
+          <label class="f" for="cx-j">Início dos juros<input type="text" id="cx-j" value="2025-02" placeholder="AAAA-MM"></label>
+        </div>
+        <label class="f" for="cx-s">Índices (AAAA-MM;IPCA%;Selic%) — valores ilustrativos, substitua pelos oficiais<textarea id="cx-s" rows="4" style="font-family:var(--f-mono)">2025-01;0,16;1,01
+2025-02;1,31;0,99
+2025-03;0,56;0,96</textarea></label>
+        <button class="btn quiet" id="b-calc" type="button">Calcular</button>
+        <div id="cx-out"></div>
+      </div></div>
+      <div class="panel"><header><h2>Quem pode o quê</h2></header><div class="body small">
+        <p>O acesso segue o compartilhamento desta página no claude.ai:</p>
+        <div class="tbl"><table>
+          <thead><tr><th>Papel no gabinete</th><th>Nível no compartilhamento</th><th>Pode</th></tr></thead>
+          <tbody>
+            <tr><td>Juiz(a) Titular</td><td>Proprietário ou Editor</td><td>tudo, inclusive teses e paradigmas</td></tr>
+            <tr><td>Assessor(a)</td><td>Colaborador</td><td>minutas, Lupa, importar precedentes</td></tr>
+            <tr><td>Estagiário(a)</td><td>Colaborador</td><td>minutas e audiência</td></tr>
+            <tr><td>Consulta</td><td>Leitor</td><td>ler teses e precedentes</td></tr>
+          </tbody></table></div>
+        <p class="muted">Cada chamada ao Claude usa o plano de quem está usando a página. Os autos não são gravados: ficam só no seu navegador enquanto a página estiver aberta.</p>
+      </div></div>
+    </div>
+  </section>
+
+  <!-- HISTÓRICO -->
+  <section role="tabpanel" id="historico" aria-labelledby="t-historico" hidden>
+    <div class="panel"><header><h2>Minhas minutas</h2><span class="muted small">Visíveis só para você.</span></header><div class="body"><div class="items" id="hist-list"></div></div></div>
+  </section>
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js"></script>
+<script src="core.js"></script>
+<script src="prompts.js"></script>
+<script src="app.js"></script>

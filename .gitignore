@@ -1,8 +1,13 @@
 node_modules/
-build/
 dist/
 coverage/
-.DS_Store
-*.log
-.env*
+.env
+.env.*
 !.env.example
+*.log
+.DS_Store
+# Nunca versionar autos, históricos ou backups com dados processuais reais
+data/
+*.tar
+*.tar.gz
+*.zip
