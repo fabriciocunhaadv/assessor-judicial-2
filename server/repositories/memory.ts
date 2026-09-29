@@ -1,4 +1,4 @@
-import type { Comunicado, Convite, Gabinete, Paradigma, PrecedenteSalvo, PromptGabinete, RegistroMinuta, RegistroUso, Repositorio, Tese, Unidade, Usuario } from "./types.js";
+import type { Caderno, RegistroAuditoria, Comunicado, Convite, Gabinete, Paradigma, PrecedenteSalvo, PromptGabinete, RegistroMinuta, RegistroUso, Repositorio, Tese, Unidade, Usuario } from "./types.js";
 
 /** Repositório em memória — apenas desenvolvimento e testes. */
 export function createMemoryRepo(): Repositorio {
@@ -13,6 +13,8 @@ export function createMemoryRepo(): Repositorio {
   const prompts = new Map<string, Map<string, PromptGabinete>>();
   const gabinetes = new Map<string, Gabinete>();
   const comunicados = new Map<string, Comunicado>();
+  const cadernos = new Map<string, Caderno>();
+  const auditorias = new Map<string, RegistroAuditoria[]>();
   const bucket = <T>(m: Map<string, Map<string, T>>, k: string) => {
     if (!m.has(k)) m.set(k, new Map());
     return m.get(k)!;
@@ -44,6 +46,14 @@ export function createMemoryRepo(): Repositorio {
       async listar() { return [...gabinetes.values()]; },
       async get(id) { return gabinetes.get(id) ?? null; },
       async salvar(g) { gabinetes.set(g.id, { ...(gabinetes.get(g.id) ?? {}), ...g }); },
+    },
+    caderno: {
+      async get(t) { return cadernos.get(t) ?? null; },
+      async salvar(t, c) { cadernos.set(t, c); },
+    },
+    auditorias: {
+      async registrar(t, a) { auditorias.set(t, [a, ...(auditorias.get(t) ?? [])]); },
+      async listar(t, limite = 50) { return (auditorias.get(t) ?? []).slice(0, limite); },
     },
     comunicados: {
       async get(t) { return comunicados.get(t ?? "__global__") ?? null; },

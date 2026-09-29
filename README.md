@@ -58,13 +58,15 @@ docs/PLANO.md               plano de desenvolvimento por fases
 | Método | Rota | Permissão | Função |
 |---|---|---|---|
 | POST | `/api/minutas` | minuta:gerar | Esteira em 2 etapas → minuta, dossiê, verificações, Resumo Executivo |
-| POST | `/api/lupa/auditar` | lupa:auditar | Matriz de Conformidade + minuta gabarito |
+| POST | `/api/lupa/auditar` | lupa:auditar | Matriz de Conformidade + minuta gabarito (diretriz, ponto de atenção; salva a auditoria) |
+| GET | `/api/lupa/auditorias` | lupa:auditar | Processos auditados do gabinete |
 | POST | `/api/audiencia/painel` | audiencia:usar | 5 pilares + perguntas |
 | POST | `/api/audiencia/termo` | audiencia:usar | Termo de audiência / homologação |
 | POST | `/api/chat` | minuta:refinar | Refino sobre o Resumo Executivo |
 | POST | `/api/pdf/extrair` | minuta:gerar | Extração no servidor (pdf-parse) + limpeza |
 | GET/POST | `/api/precedentes`, `/buscar`, `/importar` | precedentes:* | Repositório e importador de informativos |
 | GET/PUT | `/api/gabinete/teses`, `/paradigmas`, `/prompts` | minuta:gerar (ler) · juiz (editar) | Teses, paradigmas e prompts por área |
+| GET/PUT | `/api/gabinete/caderno` | minuta:gerar (ler) · juiz (editar) | Caderno de Teses em texto corrido (entra em todas as minutas) |
 | GET | `/api/gabinete/unidades` | autenticado | Lotações liberadas ao usuário |
 | GET/PUT | `/api/gabinete/unidades/todas`, `/unidades/:id` | gabinete:equipe_gerenciar | Cadastro de lotações/comarcas |
 | GET/PATCH | `/api/gabinete/equipe`, `/equipe/:uid` | gabinete:equipe_gerenciar | Membros: papel, status, unidades liberadas |

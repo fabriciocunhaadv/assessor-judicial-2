@@ -26,6 +26,17 @@ gabineteRouter.put("/teses{/:id}", requirePermission("gabinete:teses_editar"), a
   res.json(tese);
 });
 
+// ───────── Caderno de Teses (texto corrido) ─────────
+gabineteRouter.get("/caderno", requirePermission("minuta:gerar"), async (req, res) => {
+  res.json((await repo().caderno.get(req.user!.tenantId)) ?? { texto: "", atualizadoPor: "", atualizadoEm: 0 });
+});
+gabineteRouter.put("/caderno", requirePermission("gabinete:teses_editar"), async (req, res) => {
+  const b = z.object({ texto: z.string().max(200_000) }).parse(req.body);
+  const c = { texto: b.texto, atualizadoPor: req.user!.uid, atualizadoEm: Date.now() };
+  await repo().caderno.salvar(req.user!.tenantId, c);
+  res.json(c);
+});
+
 // ───────── Paradigmas ─────────
 gabineteRouter.get("/paradigmas", requirePermission("minuta:gerar"), async (req, res) => {
   res.json(await repo().paradigmas.listar(req.user!.tenantId));

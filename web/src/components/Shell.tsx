@@ -21,7 +21,7 @@ export function navItems(counts: { teses: number; paradigmas: number; prompts: n
     { to: "/modelos", label: "Teses & Modelos", icon: <Scale className="h-4 w-4" />, perm: "minuta:gerar", grupo: "repositorio", badge: counts.teses + counts.paradigmas },
     { to: "/precedentes", label: "Súmulas & Precedentes", icon: <BookOpen className="h-4 w-4" />, perm: "precedentes:ler", grupo: "repositorio" },
     { to: "/prompts", label: "Prompts por Área", icon: <Sparkles className="h-4 w-4" />, perm: "minuta:gerar", grupo: "repositorio", badge: counts.prompts },
-    { to: "/consectarios", label: "Consectários & Juros", icon: <Calculator className="h-4 w-4" />, perm: "minuta:gerar", grupo: "repositorio" },
+    { to: "/consectarios", label: "Legislação & Juros", icon: <Calculator className="h-4 w-4" />, perm: "minuta:gerar", grupo: "repositorio" },
   ];
 }
 

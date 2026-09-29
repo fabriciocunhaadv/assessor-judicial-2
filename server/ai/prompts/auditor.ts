@@ -16,6 +16,16 @@ Nota de 0 a 10.
 
 SAÍDA: um único objeto JSON conforme o schema informado.`;
 
-export function auditorUser(minuta: string, autos: string, schema: string, alertasAutomaticos: string): string {
-  return `SCHEMA JSON OBRIGATÓRIO:\n${schema}\n\nALERTAS DO VERIFICADOR AUTOMÁTICO (dados da minuta não encontrados literalmente nos autos):\n${alertasAutomaticos || "nenhum"}\n\n<minuta_assessor>\n${minuta}\n</minuta_assessor>\n\n<autos>\n${autos}\n</autos>`;
+export interface AuditorExtras {
+  diretriz?: { titulo: string; texto: string } | null;
+  caderno?: string;
+  pontoAtencao?: string;
+}
+
+export function auditorUser(minuta: string, autos: string, schema: string, alertasAutomaticos: string, extras: AuditorExtras = {}): string {
+  const partes: string[] = [];
+  if (extras.diretriz?.texto) partes.push(`DIRETRIZ DO GABINETE (${extras.diretriz.titulo}) — use-a para compor a minuta gabarito:\n${extras.diretriz.texto}`);
+  if (extras.caderno?.trim()) partes.push(`CADERNO DE TESES DO GABINETE:\n<caderno>\n${extras.caderno.trim()}\n</caderno>`);
+  if (extras.pontoAtencao?.trim()) partes.push(`PONTO DE ATENÇÃO INDICADO PELO(A) JUIZ(A) — examine-o expressamente no diagnóstico:\n${extras.pontoAtencao.trim()}`);
+  return `SCHEMA JSON OBRIGATÓRIO:\n${schema}\n\n${partes.length ? partes.join("\n\n") + "\n\n" : ""}ALERTAS DO VERIFICADOR AUTOMÁTICO (dados da minuta não encontrados literalmente nos autos):\n${alertasAutomaticos || "nenhum"}\n\n<minuta_assessor>\n${minuta}\n</minuta_assessor>\n\n<autos>\n${autos}\n</autos>`;
 }

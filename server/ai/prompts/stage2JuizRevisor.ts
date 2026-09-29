@@ -7,6 +7,8 @@ export interface Stage2Contexto {
   promptArea?: { titulo: string; area: string; texto: string } | null;
   paradigma?: { titulo: string; texto: string } | null;
   teses: { titulo: string; texto: string }[];
+  /** Caderno de Teses do gabinete em texto corrido. */
+  caderno?: string;
   precedentes: { identificador: string; tribunal: string; enunciado: string }[];
   instrucaoDoAssessor?: string;
 }
@@ -54,6 +56,14 @@ Reproduza rigorosamente o estilo, a ordem dos tópicos, a capitulação, os tít
 <paradigma titulo="${ctx.paradigma.titulo.replace(/"/g, "'")}">
 ${ctx.paradigma.texto}
 </paradigma>`;
+  }
+  if (ctx.caderno?.trim()) {
+    s += `
+
+CADERNO DE TESES DO GABINETE (regras gerais do juízo, de observância obrigatória quando o caso se enquadrar):
+<caderno>
+${ctx.caderno.trim()}
+</caderno>`;
   }
   if (ctx.teses.length) {
     s += `

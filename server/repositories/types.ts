@@ -51,6 +51,24 @@ export interface Gabinete {
   criadoEm: number;
 }
 
+/** Caderno de Teses em texto corrido (um documento por gabinete). */
+export interface Caderno {
+  texto: string;
+  atualizadoPor: string;
+  atualizadoEm: number;
+}
+
+export interface RegistroAuditoria {
+  id: string;
+  numeroProcesso: string;
+  assessorNome: string;
+  nota: number;
+  pendencias: number;
+  criadoPor: string;
+  criadoEm: number;
+  diagnostico: unknown;
+}
+
 export interface Comunicado {
   texto: string;
   nivel: "info" | "alerta";
@@ -139,6 +157,14 @@ export interface Repositorio {
     listar(): Promise<Gabinete[]>;
     get(id: string): Promise<Gabinete | null>;
     salvar(g: Gabinete): Promise<void>;
+  };
+  caderno: {
+    get(tenantId: string): Promise<Caderno | null>;
+    salvar(tenantId: string, c: Caderno): Promise<void>;
+  };
+  auditorias: {
+    registrar(tenantId: string, a: RegistroAuditoria): Promise<void>;
+    listar(tenantId: string, limite?: number): Promise<RegistroAuditoria[]>;
   };
   comunicados: {
     /** tenantId null = comunicado global (Super Admin). */

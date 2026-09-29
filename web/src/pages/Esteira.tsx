@@ -1,5 +1,5 @@
-import { ClipboardCopy, Download, FileText, ListChecks, ScanSearch, Sparkles, SquarePen, Type, X } from "lucide-react";
-import { useMemo, useState, type ReactNode } from "react";
+import { BookOpen, ClipboardCopy, Compass, Download, Eye, FileText, Gavel, ListChecks, Scale, ScanSearch, Sparkles, SquarePen, Type, X } from "lucide-react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { TIPO_ATO_LABEL, TIPOS_ATO, type TipoAto } from "@shared/gabinete";
 import { cleanJudicialText } from "@shared/judicialTextCleaner";
@@ -18,7 +18,7 @@ function GuiaInicio({ fechar }: { fechar(): void }) {
   const passos = [
     ["Anexar os autos", "Arraste o PDF do processo ou cole o texto. Assinaturas, carimbos e cabeçalhos repetidos são removidos."],
     ["Escolher o prompt e o ato", "Selecione o prompt da área e o tipo de minuta, ou deixe em Auto-detectar pela fase processual."],
-    ["Minuta Paradigma (opcional)", "No Modo Avançado, vincule um modelo do magistrado para clonar estilo, tópicos e dispositivo."],
+    ["Minuta Paradigma (opcional)", "Vincule um modelo do magistrado para clonar estilo, tópicos e dispositivo. No Modo Avançado, oriente a tese pelo co-piloto."],
     ["Executar e conferir", "Gere a minuta em duas etapas e revise a conferência automática antes de levar à Lupa."],
   ];
   return (
@@ -57,10 +57,19 @@ export default function Esteira() {
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [copiado, setCopiado] = useState(false);
+  const [paradigmaAtivo, setParadigmaAtivo] = useState(true);
+  const [verParadigma, setVerParadigma] = useState(false);
+  const [copiloto, setCopiloto] = useState(false);
+  const [repo, setRepo] = useState<{ caderno: number; precedentes: number } | null>(null);
+  useEffect(() => {
+    Promise.all([api.get<{ texto: string }>("/gabinete/caderno").catch(() => ({ texto: "" })), api.get<unknown[]>("/precedentes").catch(() => [])])
+      .then(([c, p]) => setRepo({ caderno: c.texto.length, precedentes: p.length }));
+  }, []);
 
   const r = caso.resultado;
   const prompt = prompts.find((p) => p.id === promptId);
   const unidade = unidades.find((u) => u.id === unidadeId);
+  const paradigma = paradigmas.find((p) => p.id === paradigmaId);
   const promptsFiltrados = useMemo(() => {
     const q = filtro.trim().toLowerCase();
     return q ? prompts.filter((p) => `${p.titulo} ${p.area} ${p.texto}`.toLowerCase().includes(q)) : prompts;
@@ -78,8 +87,8 @@ export default function Esteira() {
     try {
       const res = await api.post<MinutaOutput>("/minutas", {
         autos: caso.autos, tipoAto, unidadeId: unidadeId || null, promptId: promptId || null,
-        paradigmaId: modo === "avancado" ? paradigmaId || null : null,
-        instrucao: modo === "avancado" ? instrucao : undefined, usarTeses,
+        paradigmaId: paradigmaAtivo ? paradigmaId || null : null,
+        instrucao: instrucao.trim() || undefined, usarTeses,
       });
       atualizar({ minuta: res.markdown, resumoExecutivo: res.resumoExecutivo, numeroProcesso: res.dossie.numeroProcesso, resultado: res });
       setAba("minuta");
@@ -157,26 +166,64 @@ export default function Esteira() {
             <Segmented label="Tipo de minuta" value={tipoAto} onChange={setTipoAto} options={TIPOS_ATO.map((t) => ({ value: t, label: TIPO_ATO_LABEL[t] }))} />
           </Field>
 
-          {modo === "avancado" && (
-            <div className="space-y-4 rounded-lg bg-slate-50 p-3 dark:bg-slate-950">
-              <Field label="Minuta Paradigma (espelho estrutural)">
-                <select value={paradigmaId} onChange={(e) => setParadigmaId(e.target.value)} className={inputCls}>
-                  <option value="">Sem paradigma</option>
-                  {paradigmas.map((p) => <option key={p.id} value={p.id}>{p.titulo} ({p.tipoAto})</option>)}
-                </select>
-              </Field>
-              <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
-                <input type="checkbox" checked={usarTeses} onChange={(e) => setUsarTeses(e.target.checked)} className="accent-emerald-600" />
-                Aplicar o Caderno de Teses ({teses.filter((t) => t.ativa !== false).length} ativas)
+          {/* Minuta Paradigma: espelho estrutural de decisões anteriores do magistrado */}
+          <div className="space-y-3 rounded-lg border border-slate-200 p-3 dark:border-slate-800">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div className="flex gap-2.5">
+                <div className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900"><Gavel className="h-4 w-4" /></div>
+                <div>
+                  <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">Minuta Paradigma / Caso idêntico do juiz</p>
+                  <p className="text-xs text-slate-500">Espelha estilo, tópicos e dispositivo em casos idênticos (uso sob demanda).</p>
+                </div>
+              </div>
+              <label className="flex items-center gap-2 text-xs font-medium text-slate-700 dark:text-slate-200">
+                <input type="checkbox" className="accent-emerald-600" checked={paradigmaAtivo} onChange={(e) => setParadigmaAtivo(e.target.checked)} /> Ativo no prompt
               </label>
-              <Field label="Orientação para este caso">
-                <textarea rows={3} value={instrucao} onChange={(e) => setInstrucao(e.target.value)} className={inputCls} placeholder="Ex.: examinar a impugnação da assinatura do contrato (Tema 1.061/STJ)." />
-              </Field>
             </div>
+            <div className="flex gap-2">
+              <select value={paradigmaId} onChange={(e) => { setParadigmaId(e.target.value); setVerParadigma(false); }} className={inputCls} aria-label="Minuta paradigma">
+                <option value="">{paradigmas.length ? `Biblioteca do juiz (${paradigmas.length}) — sem paradigma` : "Nenhum paradigma na biblioteca"}</option>
+                {paradigmas.map((p) => <option key={p.id} value={p.id}>{p.titulo} ({p.tipoAto})</option>)}
+              </select>
+              {paradigma && <Button variant="ghost" size="sm" onClick={() => setVerParadigma(!verParadigma)} aria-label="Ver minuta paradigma"><Eye className="h-3.5 w-3.5" /></Button>}
+            </div>
+            {paradigma && (
+              <div className="rounded-lg bg-slate-50 p-3 text-xs dark:bg-slate-950">
+                <div className="flex flex-wrap items-center gap-2"><Badge tone="sky">{paradigma.tipoAto}</Badge><span className="text-slate-500">{paradigma.texto.length.toLocaleString("pt-BR")} caracteres</span>{paradigmaAtivo && <Badge tone="green">Pronto para injeção no prompt</Badge>}</div>
+                <p className="mt-1.5 font-medium text-slate-800 dark:text-slate-100">{paradigma.titulo}</p>
+                <p className={`mt-1 whitespace-pre-wrap text-slate-600 dark:text-slate-300 ${verParadigma ? "max-h-72 overflow-auto" : "line-clamp-2"}`}>{paradigma.texto}</p>
+              </div>
+            )}
+          </div>
+
+          {modo === "avancado" && (
+            <>
+              {/* Co-piloto: o assessor orienta a tese antes da redação */}
+              <div className="space-y-2 rounded-lg border border-emerald-200 bg-emerald-50/40 p-3 dark:border-emerald-900 dark:bg-emerald-950/30">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-slate-100"><Compass className="h-4 w-4 text-emerald-600" /> Controle total da decisão <Badge tone="green">Co-piloto</Badge></p>
+                  <Button size="sm" variant={copiloto || instrucao ? "primary" : "ghost"} onClick={() => setCopiloto(!copiloto)}>{copiloto ? "Fechar" : instrucao ? "Orientação definida" : "Orientar a IA"}</Button>
+                </div>
+                <p className="text-xs text-slate-600 dark:text-slate-300">Sem caixa-preta: indique a tese, o resultado pretendido e a doutrina antes de a IA redigir. A orientação vale só para este caso e respeita as regras fixas (adstrição e fidelidade aos autos).</p>
+                {copiloto && <textarea rows={4} value={instrucao} onChange={(e) => setInstrucao(e.target.value)} className={inputCls} placeholder="Ex.: julgar parcialmente procedente: reconhecer a fraude no consignado (Súmula 479/STJ), restituição simples por ser anterior a 30/03/2021, dano moral de R$ 5.000,00." />}
+              </div>
+
+              {/* Estado do repositório que entra automaticamente na minuta */}
+              <div className="space-y-2 text-xs">
+                <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 px-3 py-2 dark:border-slate-800">
+                  <label className="flex items-center gap-2 text-slate-700 dark:text-slate-200"><input type="checkbox" className="accent-emerald-600" checked={usarTeses} onChange={(e) => setUsarTeses(e.target.checked)} /><Scale className="h-3.5 w-3.5" /><span><strong>Caderno de Teses do gabinete:</strong> {repo?.caderno ? `${repo.caderno.toLocaleString("pt-BR")} caracteres` : "vazio"} · {teses.filter((t) => t.ativa !== false).length} tese(s) avulsa(s)</span></label>
+                  <button type="button" onClick={() => navigate("/modelos")} className="font-medium text-emerald-700 hover:underline dark:text-emerald-300">Editar</button>
+                </div>
+                <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 px-3 py-2 dark:border-slate-800">
+                  <span className="flex items-center gap-2 text-slate-700 dark:text-slate-200"><span className={`h-2 w-2 rounded-full ${repo?.precedentes ? "bg-emerald-500" : "bg-slate-300"}`} /><BookOpen className="h-3.5 w-3.5" /><span><strong>Consulta vinculante {repo?.precedentes ? "ativa" : "sem base"}:</strong> {repo?.precedentes ?? 0} súmula(s) e tese(s) (STF · STJ · TNU · TJGO) consultadas automaticamente</span></span>
+                  <button type="button" onClick={() => navigate("/precedentes")} className="font-medium text-emerald-700 hover:underline dark:text-emerald-300">Consultar repositório</button>
+                </div>
+              </div>
+            </>
           )}
 
           <Button onClick={gerar} loading={carregando} disabled={!caso.autos} className="w-full py-2.5">
-            {!carregando && <Sparkles className="h-4 w-4" />} {carregando ? "Analisando os autos…" : "Gerar análise e minuta"}
+            {!carregando && <Sparkles className="h-4 w-4" />} {carregando ? "Analisando os autos…" : "Gerar minuta judicial"}
           </Button>
           {carregando && <p className="text-xs text-slate-500">Etapa 1: o Assessor Fático extrai cronologia, pedidos e provas. Etapa 2: o Juiz Revisor redige a minuta. Autos volumosos podem levar alguns minutos.</p>}
           <ErrorBox erro={erro} />

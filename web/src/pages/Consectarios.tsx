@@ -1,10 +1,14 @@
-import { Calculator } from "lucide-react";
+import { BookMarked, Calculator, Landmark } from "lucide-react";
 import { useState } from "react";
 import { calcularConsectarios, type ResultadoConsectarios } from "@shared/consectarios";
-import { Button, Card, ErrorBox, Field, inputCls } from "../components/ui";
+import { Badge, Button, Card, ErrorBox, Field, inputCls, Tabs } from "../components/ui";
+import { REGIMES } from "../lib/regimes";
 
-/** Calculadora da Lei nº 14.905/2024 (roda no navegador, sem IA). */
+/** Legislação & Juros: catálogo de regimes por microssistema e calculadora da Lei nº 14.905/2024. */
 export default function Consectarios() {
+  const [aba, setAba] = useState<"regimes" | "calculadora">("regimes");
+  const [regimeId, setRegimeId] = useState(REGIMES[0].id);
+  const reg = REGIMES.find((r) => r.id === regimeId) ?? REGIMES[0];
   const [f, setF] = useState({ principal: "10000", inicioCorrecao: "2025-01", inicioJuros: "2025-02", fim: "2025-03", series: "2025-01;0,16;1,01\n2025-02;1,31;0,99\n2025-03;0,56;0,96" });
   const [r, setR] = useState<ResultadoConsectarios | null>(null);
   const [erro, setErro] = useState<string | null>(null);
@@ -28,9 +32,45 @@ export default function Consectarios() {
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-lg font-semibold text-slate-900 dark:text-white">Consectários & Juros</h1>
-        <p className="text-sm text-slate-500">Lei nº 14.905/2024: correção pelo IPCA (art. 389, parágrafo único, do CC) e juros pela taxa legal, Selic menos IPCA, nunca negativa (art. 406, §§ 1º e 3º).</p>
+        <h1 className="text-lg font-semibold text-slate-900 dark:text-white">Legislação & Juros</h1>
+        <p className="text-sm text-slate-500">Regimes de correção monetária e juros por microssistema, com a calculadora da Lei nº 14.905/2024.</p>
       </div>
+      <Tabs value={aba} onChange={setAba} tabs={[{ value: "regimes", label: <><Landmark className="h-4 w-4" /> Catálogo de regimes</>, count: REGIMES.length }, { value: "calculadora", label: <><Calculator className="h-4 w-4" /> Calculadora</> }]} />
+
+      {aba === "regimes" && (
+        <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,340px)_minmax(0,1fr)]">
+          <Card title="Microssistemas e regimes" bodyClass="space-y-2 p-3">
+            {REGIMES.map((r) => (
+              <button key={r.id} type="button" onClick={() => setRegimeId(r.id)} aria-pressed={r.id === regimeId}
+                className={`w-full rounded-lg border p-3 text-left ${r.id === regimeId ? "border-emerald-400 bg-emerald-50/60 dark:border-emerald-800 dark:bg-emerald-950/40" : "border-slate-200 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/50"}`}>
+                <span className="block text-sm font-semibold text-slate-900 dark:text-slate-100">{r.titulo}</span>
+                <span className="block text-[11px] font-semibold uppercase tracking-wide text-slate-400">{r.area}</span>
+                <span className="mt-1 block text-xs text-slate-600 dark:text-slate-300">{r.resumo}</span>
+              </button>
+            ))}
+          </Card>
+          <Card title={reg.titulo} icon={<BookMarked className="h-4 w-4 text-emerald-600" />} bodyClass="space-y-4 p-4" actions={<Badge tone="sky">{reg.area}</Badge>}>
+            <div className="grid gap-3 md:grid-cols-2">
+              <div className="rounded-lg bg-slate-50 p-3 dark:bg-slate-950"><p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Correção monetária</p><p className="mt-1 text-sm">{reg.correcao}</p></div>
+              <div className="rounded-lg bg-slate-50 p-3 dark:bg-slate-950"><p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Juros de mora</p><p className="mt-1 text-sm">{reg.juros}</p></div>
+            </div>
+            <div><h3 className="mb-1 text-sm font-semibold">Termos iniciais</h3><ul className="list-disc space-y-1 pl-5 text-sm text-slate-700 dark:text-slate-300">{reg.termos.map((t) => <li key={t}>{t}</li>)}</ul></div>
+            <div className="space-y-2">
+              <h3 className="text-sm font-semibold">Diplomas e artigos fundamentais</h3>
+              {reg.diplomas.map((d) => (
+                <div key={d.nome} className="rounded-lg border border-slate-200 p-3 dark:border-slate-800">
+                  <p className="flex flex-wrap items-center justify-between gap-2 text-sm font-medium">{d.nome}{d.artigos && <span className="rounded bg-violet-50 px-1.5 py-0.5 font-mono text-[11px] text-violet-700 dark:bg-violet-950 dark:text-violet-200">{d.artigos}</span>}</p>
+                  <p className="text-xs text-slate-500">{d.nota}</p>
+                </div>
+              ))}
+            </div>
+            {reg.observacoes.map((o) => <p key={o} className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900 dark:bg-amber-950 dark:text-amber-100">{o}</p>)}
+            <p className="text-xs text-slate-500">Referência de apoio. Confira sempre a legislação e a jurisprudência vigentes na data da decisão.</p>
+          </Card>
+        </div>
+      )}
+
+      {aba === "calculadora" && (
       <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,420px)_minmax(0,1fr)]">
         <Card title="Parâmetros" icon={<Calculator className="h-4 w-4 text-emerald-600" />} bodyClass="space-y-3 p-4">
           <div className="grid grid-cols-2 gap-3">
@@ -61,6 +101,7 @@ export default function Consectarios() {
           ) : <p className="p-4 text-sm text-slate-500">Informe os parâmetros e clique em Calcular.</p>}
         </Card>
       </div>
+      )}
     </div>
   );
 }

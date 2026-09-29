@@ -14,6 +14,8 @@ import type { Repositorio } from "./types.js";
  *   gabinetes/{tenantId}/unidades/{id}          lotações
  *   gabinetes/{tenantId}/prompts/{id}           (+ /historico/{ts})
  *   config/comunicado, gabinetes/{tenantId}/config/comunicado
+ *   gabinetes/{tenantId}/config/caderno         (+ /historico/{ts})
+ *   gabinetes/{tenantId}/auditorias/{id}
  * Todas as escritas usam { merge: true }. Nenhuma rotina de seed.
  */
 export function createFirestoreRepo(db: Firestore): Repositorio {
@@ -54,6 +56,14 @@ export function createFirestoreRepo(db: Firestore): Repositorio {
       async listar() { const q = await db.collection("tenants").get(); return q.docs.map((d) => d.data() as any); },
       async get(id) { const s = await db.collection("tenants").doc(id).get(); return s.exists ? (s.data() as any) : null; },
       async salvar(g) { await db.collection("tenants").doc(g.id).set(g, { merge: true }); },
+    },
+    caderno: {
+      async get(t) { const s = await gab(t).collection("config").doc("caderno").get(); return s.exists ? (s.data() as any) : null; },
+      async salvar(t, c) { await salvarComHistorico(gab(t).collection("config"), "caderno", c); },
+    },
+    auditorias: {
+      async registrar(t, a) { await gab(t).collection("auditorias").doc(a.id).set(a, { merge: true }); },
+      async listar(t, limite = 50) { const q = await gab(t).collection("auditorias").orderBy("criadoEm", "desc").limit(limite).get(); return q.docs.map((d) => d.data() as any); },
     },
     comunicados: {
       async get(t) { const ref = t ? gab(t).collection("config").doc("comunicado") : db.collection("config").doc("comunicado"); const s = await ref.get(); return s.exists ? (s.data() as any) : null; },

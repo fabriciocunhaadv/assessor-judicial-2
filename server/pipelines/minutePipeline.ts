@@ -115,12 +115,13 @@ export async function gerarMinuta(user: AuthUser, input: MinutaInput): Promise<M
   const tipoAto: Exclude<TipoAto, "auto"> = input.tipoAto && input.tipoAto !== "auto" ? input.tipoAto : sugerido[dossie.atoSugerido];
   const piso = exigePisoDeParagrafos(tipoAto) ? MIN_PARAGRAFOS : 0;
 
-  const [paradigma, teses, basePrecedentes, unidades, promptArea] = await Promise.all([
+  const [paradigma, teses, basePrecedentes, unidades, promptArea, caderno] = await Promise.all([
     input.paradigmaId ? r.paradigmas.get(user.tenantId, input.paradigmaId) : Promise.resolve(null),
     input.usarTeses === false ? Promise.resolve([]) : r.teses.listar(user.tenantId),
     r.precedentes.listar(user.tenantId),
     input.unidadeId ? r.unidades.listar(user.tenantId) : Promise.resolve([]),
     input.promptId ? r.prompts.get(user.tenantId, input.promptId) : Promise.resolve(null),
+    input.usarTeses === false ? Promise.resolve(null) : r.caderno.get(user.tenantId),
   ]);
   const unidade = unidades.find((u) => u.id === input.unidadeId) ?? null;
   const tema = [...dossie.pedidos.map((p) => p.descricao), ...dossie.pontosControvertidos, dossie.classe].join(" ");
@@ -134,6 +135,7 @@ export async function gerarMinuta(user: AuthUser, input: MinutaInput): Promise<M
     promptArea: promptArea?.ativo === false ? null : promptArea,
     paradigma,
     teses: teses.filter((t) => t.ativa),
+    caderno: caderno?.texto,
     precedentes,
     instrucaoDoAssessor: input.instrucao,
   });

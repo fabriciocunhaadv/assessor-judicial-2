@@ -1,7 +1,7 @@
-import { Scale, Zap } from "lucide-react";
-import { useState } from "react";
+import { ClipboardCopy, Plus, Save, Scale, Zap } from "lucide-react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Badge, Button, Card, EmptyState, ErrorBox, Field, inputCls, Tabs } from "../components/ui";
+import { Badge, Button, Card, EmptyState, ErrorBox, Field, inputCls, Notice, Tabs } from "../components/ui";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { useGabinete } from "../lib/gabinete";
@@ -11,7 +11,16 @@ export default function Modelos() {
   const { pode } = useAuth();
   const { teses, paradigmas, recarregar } = useGabinete();
   const navigate = useNavigate();
-  const [aba, setAba] = useState<"paradigmas" | "teses">("paradigmas");
+  const [aba, setAba] = useState<"caderno" | "paradigmas" | "teses">("caderno");
+  const [caderno, setCaderno] = useState("");
+  const [cadernoSalvo, setCadernoSalvo] = useState("");
+  const [cadernoInfo, setCadernoInfo] = useState<{ atualizadoEm: number } | null>(null);
+  const [ok, setOk] = useState<string | null>(null);
+  useEffect(() => {
+    api.get<{ texto: string; atualizadoEm: number }>("/gabinete/caderno").then((c) => { setCaderno(c.texto); setCadernoSalvo(c.texto); setCadernoInfo(c.atualizadoEm ? { atualizadoEm: c.atualizadoEm } : null); }).catch((e) => setErro(e.message));
+  }, []);
+  const topicos = (caderno.match(/^\s*\d+(\.\d+)*\s*[-.)]/gm) ?? []).length;
+  const novoLancamento = () => setCaderno((t) => `${t.trimEnd()}${t.trim() ? "\n\n" : ""}N. TEMA\n\nN.1. Hipótese:\n  - \n\nN.2. Prova necessária:\n  - \n\nN.3. Exceções:\n  - \n`);
   const [novaTese, setNovaTese] = useState({ titulo: "", texto: "" });
   const [novoPar, setNovoPar] = useState({ titulo: "", tipoAto: "Sentença", texto: "" });
   const [erro, setErro] = useState<string | null>(null);
@@ -32,8 +41,27 @@ export default function Modelos() {
         <h1 className="text-lg font-semibold text-slate-900 dark:text-white">Teses & Modelos</h1>
         <p className="text-sm text-slate-500">Paradigmas do magistrado e o Caderno de Teses que entram em toda minuta do gabinete.</p>
       </div>
-      <Tabs value={aba} onChange={setAba} tabs={[{ value: "paradigmas", label: "Minutas Paradigma", count: paradigmas.length }, { value: "teses", label: "Caderno de Teses", count: teses.length }]} />
+      <Tabs value={aba} onChange={(a) => { setAba(a); setOk(null); }} tabs={[{ value: "caderno", label: "Caderno de Teses" }, { value: "paradigmas", label: "Modelos de decisões (paradigmas)", count: paradigmas.length }, { value: "teses", label: "Teses avulsas", count: teses.length }]} />
       <ErrorBox erro={erro} />
+      {ok && <Notice tone="ok">{ok}</Notice>}
+
+      {aba === "caderno" && (
+        <div className="space-y-4">
+          <Notice tone="warn"><strong>Como funciona:</strong> as regras e teses deste caderno entram <strong>obrigatoriamente em todas as análises e minutas</strong> do gabinete, qualquer que seja o prompt escolhido. Use-o para regras gerais: comandos padronizados do juízo, teses pacificadas (ex.: dano moral), regras de citação e parâmetros de custas. Para clonar o formato de sentenças específicas, use os Modelos de decisões.</Notice>
+          <Card title="Editor de teses e hipóteses do juízo" bodyClass="space-y-3 p-4" actions={<>
+            <Badge tone="amber">{topicos} tópico(s)</Badge>
+            {pode("gabinete:teses_editar") && <Button size="sm" variant="ghost" onClick={novoLancamento}><Plus className="h-3.5 w-3.5" /> Inserir novo lançamento</Button>}
+            <Button size="sm" variant="ghost" disabled={!caderno} onClick={() => void navigator.clipboard.writeText(caderno).then(() => setOk("Caderno copiado."), () => {})}><ClipboardCopy className="h-3.5 w-3.5" /> Copiar tudo</Button>
+          </>}>
+            <textarea rows={22} readOnly={!pode("gabinete:teses_editar")} className={`${inputCls} font-mono text-xs leading-relaxed`} value={caderno} onChange={(e) => setCaderno(e.target.value)}
+              placeholder={"1 - JUIZADO ESPECIAL CÍVEL\n\n1. CONTRATOS BANCÁRIOS / EMPRÉSTIMO CONSIGNADO\n\n1.1. Hipótese:\n  - Quando a instituição financeira comprovar a disponibilização do crédito e juntar contrato válido: JULGAR IMPROCEDENTES os pedidos.\n\n1.2. Prova necessária:\n  - Instrumento contratual com assinatura ou log de autenticação eletrônica.\n\n1.3. Exceções:\n  - …"} />
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-xs text-slate-500">{caderno.length.toLocaleString("pt-BR")} caracteres{cadernoInfo ? ` · salvo em ${new Date(cadernoInfo.atualizadoEm).toLocaleString("pt-BR")}` : ""}{caderno !== cadernoSalvo ? " · alterações não salvas" : ""}. Cada gravação guarda a versão anterior no histórico.</p>
+              {pode("gabinete:teses_editar") && <Button loading={salvando} disabled={caderno === cadernoSalvo} onClick={() => salvar(async () => { const c = await api.post<{ texto: string; atualizadoEm: number }>("/gabinete/caderno", { texto: caderno }, "PUT"); setCadernoSalvo(c.texto); setCadernoInfo({ atualizadoEm: c.atualizadoEm }); setOk("Caderno salvo."); })}><Save className="h-4 w-4" /> Salvar alterações no Caderno</Button>}
+            </div>
+          </Card>
+        </div>
+      )}
 
       {aba === "paradigmas" && (
         <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,420px)]">

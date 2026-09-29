@@ -64,6 +64,12 @@ Com base nas telas do sistema anterior:
 - Administração do Gabinete: convite por e-mail (ativado no primeiro login), papéis, unidades liberadas por membro, lotações/comarcas e aviso à equipe.
 - Painel Super Admin: indicadores, gabinetes (criar/suspender), usuários globais (papel, gabinete, status), comunicado geral e consumo.
 - Limite de requisições separado: 300/min para navegação e 20/min para chamadas de IA.
+- Lupa do Magistrado com abas Bancada de Tripla Conferência, Nova auditoria (diretriz, nº do processo, assessor, minuta, autos PDF/texto, ponto de atenção do juiz) e Processos auditados (salvos no banco).
+- Súmulas, Teses e Informativos: cartões com ementa, etiquetas, copiar ementa, filtros com contagem por tribunal, paginação e links das bases oficiais.
+- Legislação & Juros: catálogo de regimes de correção e juros por microssistema (civil, consumo, Fazenda Pública/EC 113, previdenciário, tributário, JEC) + calculadora.
+- Prompts: Selecionar/Em uso, backup e importação em JSON (importação só acrescenta).
+- Caderno de Teses em texto corrido (com histórico), injetado em todas as minutas e auditorias; teses avulsas mantidas.
+- Nova Análise: card de Minuta Paradigma com prévia e "Ativo no prompt", co-piloto "Controle total da decisão" e status do caderno e da consulta vinculante.
 - Não há migração de dados: o cadastro é refeito no sistema novo.
 
 ## Migração do legado ⏭
@@ -73,4 +79,7 @@ O sistema anterior está em `legado/` (fora do build). Funcionalidades dele que 
 - Manual do Sistema e Tour Guiado — `SystemManualModal.tsx`, `SystemTour.tsx` (regra do AGENTS.md antigo: atualizar a cada entrega)
 - Guia do PROJUDI, calendário de prazos do gabinete, tickets de suporte e avisos globais
 - Gerenciador de prompts personalizados, histórico e comparação de versões de minutas, painel Fato × Prova, Raio-X do processo
-- Consulta legislativa e extensão de navegador para importar autos
+- Pesquisa legislativa com IA (o catálogo estático de regimes já existe), sincronização semanal automática de informativos e pesquisa ao vivo (grounding)
+- Base de conhecimento do gabinete, "Mapear PDFs" e varredura automática para sugerir teses
+- Guia do PROJUDI, Agenda de prazos, "Conheça o Assessor" e "Raio X da Lotação"
+- Extensão de navegador para importar autos
