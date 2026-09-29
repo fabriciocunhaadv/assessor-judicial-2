@@ -8,6 +8,9 @@ import { useAuth } from "./lib/auth";
 import { authDisabled } from "./lib/firebase";
 import { useGabinete } from "./lib/gabinete";
 import Admin from "./pages/Admin";
+import Agenda from "./pages/Agenda";
+import Ajuda from "./pages/Ajuda";
+import GuiaProjudi from "./pages/GuiaProjudi";
 import Audiencia from "./pages/Audiencia";
 import Chat from "./pages/Chat";
 import Consectarios from "./pages/Consectarios";
@@ -29,6 +32,9 @@ const ROTAS: { path: string; perm: Permission; el: ReactNode }[] = [
   { path: "/precedentes", perm: "precedentes:ler", el: <Precedentes /> },
   { path: "/prompts", perm: "minuta:gerar", el: <Prompts /> },
   { path: "/consectarios", perm: "minuta:gerar", el: <Consectarios /> },
+  { path: "/agenda", perm: "minuta:gerar", el: <Agenda /> },
+  { path: "/projudi", perm: "minuta:gerar", el: <GuiaProjudi /> },
+  { path: "/ajuda", perm: "minuta:gerar", el: <Ajuda /> },
   { path: "/equipe", perm: "gabinete:equipe_gerenciar", el: <Equipe /> },
   { path: "/admin", perm: "admin:tenants", el: <Admin /> },
 ];

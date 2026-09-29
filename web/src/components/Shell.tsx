@@ -1,5 +1,5 @@
 import {
-  BookOpen, Building2, Calculator, ChevronDown, FileText, Gavel, History, LogOut, Megaphone, MessageSquare, Moon, Scale, ScanSearch,
+  BookOpen, Building2, Calculator, CalendarDays, ClipboardList, LifeBuoy, ChevronDown, FileText, Gavel, History, LogOut, Megaphone, MessageSquare, Moon, Scale, ScanSearch,
   Settings, Shield, Sparkles, Sun, Users, X,
 } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
@@ -18,10 +18,12 @@ export function navItems(counts: { teses: number; paradigmas: number; prompts: n
     { to: "/audiencia", label: "Mesa de Audiência", icon: <Gavel className="h-4 w-4" />, perm: "audiencia:usar", grupo: "acoes" },
     { to: "/chat", label: "Chat & Refino", icon: <MessageSquare className="h-4 w-4" />, perm: "minuta:refinar", grupo: "acoes" },
     { to: "/historico", label: "Histórico", icon: <History className="h-4 w-4" />, perm: "minuta:gerar", grupo: "acoes" },
+    { to: "/agenda", label: "Agenda", icon: <CalendarDays className="h-4 w-4" />, perm: "minuta:gerar", grupo: "acoes" },
     { to: "/modelos", label: "Teses & Modelos", icon: <Scale className="h-4 w-4" />, perm: "minuta:gerar", grupo: "repositorio", badge: counts.teses + counts.paradigmas },
     { to: "/precedentes", label: "Súmulas & Precedentes", icon: <BookOpen className="h-4 w-4" />, perm: "precedentes:ler", grupo: "repositorio" },
     { to: "/prompts", label: "Prompts por Área", icon: <Sparkles className="h-4 w-4" />, perm: "minuta:gerar", grupo: "repositorio", badge: counts.prompts },
     { to: "/consectarios", label: "Legislação & Juros", icon: <Calculator className="h-4 w-4" />, perm: "minuta:gerar", grupo: "repositorio" },
+    { to: "/projudi", label: "Guia do PROJUDI", icon: <ClipboardList className="h-4 w-4" />, perm: "minuta:gerar", grupo: "repositorio" },
   ];
 }
 
@@ -117,6 +119,7 @@ export function TopBar({ escuro, alternarTema, itensMobile }: { escuro: boolean;
                 {pode("gabinete:equipe_gerenciar") && itemMenu("/equipe", <Users className="h-4 w-4" />, "Equipe, lotações e avisos")}
                 {itemMenu("/prompts", <Sparkles className="h-4 w-4" />, "Prompts por área")}
                 {itemMenu("/modelos", <Scale className="h-4 w-4" />, "Teses & Modelos")}
+                {itemMenu("/ajuda", <LifeBuoy className="h-4 w-4" />, "Manual de uso")}
                 <div className="my-1 border-t border-slate-800" />
                 <button type="button" role="menuitem" onClick={() => { alternarTema(); setMenu(false); }} className="flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-left text-sm text-slate-200 hover:bg-slate-800">
                   {escuro ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />} Tema {escuro ? "claro" : "escuro"}

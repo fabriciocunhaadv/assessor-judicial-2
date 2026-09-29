@@ -10,6 +10,7 @@ import { Badge, Button, Card, EmptyState, ErrorBox, Field, inputCls, Notice, Seg
 import { api } from "../lib/api";
 import { useCaso } from "../lib/caso";
 import { useGabinete } from "../lib/gabinete";
+import { baixarWord } from "../lib/word";
 
 const lerPref = (k: string, d: string) => { try { return localStorage.getItem(k) ?? d; } catch { return d; } };
 const gravarPref = (k: string, v: string) => { try { localStorage.setItem(k, v); } catch { /* sem armazenamento */ } };
@@ -102,12 +103,16 @@ export default function Esteira() {
   async function copiar() {
     try { await navigator.clipboard.writeText(caso.minuta); setCopiado(true); setTimeout(() => setCopiado(false), 2000); } catch { /* sem permissão */ }
   }
-  function baixar() {
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(new Blob([caso.minuta], { type: "text/markdown;charset=utf-8" }));
-    a.download = `minuta-${(caso.numeroProcesso || "processo").replace(/[^\w.-]+/g, "_")}.md`;
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  const [gerandoWord, setGerandoWord] = useState(false);
+  async function baixar() {
+    setGerandoWord(true);
+    try {
+      const n = caso.numeroProcesso && caso.numeroProcesso !== "n/i" ? caso.numeroProcesso : "";
+      await baixarWord(caso.minuta, `minuta-${n || "processo"}`, {
+        cabecalho: `PODER JUDICIÁRIO${unidade ? `\n${unidade.nome} — Comarca de ${unidade.comarca}` : ""}`,
+        processo: n ? `Processo nº ${n}` : undefined,
+      });
+    } catch (e) { setErro(`Não foi possível gerar o Word: ${(e as Error).message}`); } finally { setGerandoWord(false); }
   }
 
   const v = r?.verificacoes;
@@ -233,7 +238,7 @@ export default function Esteira() {
           actions={caso.minuta && (
             <>
               <Button variant="ghost" size="sm" onClick={copiar}><ClipboardCopy className="h-3.5 w-3.5" /> {copiado ? "Copiado" : "Copiar"}</Button>
-              <Button variant="ghost" size="sm" onClick={baixar}><Download className="h-3.5 w-3.5" /> Baixar</Button>
+              <Button variant="ghost" size="sm" loading={gerandoWord} onClick={() => void baixar()}>{!gerandoWord && <Download className="h-3.5 w-3.5" />} Word (.docx)</Button>
               <Button variant="dark" size="sm" onClick={() => navigate("/lupa")}><ScanSearch className="h-3.5 w-3.5" /> Conferir na Lupa</Button>
             </>
           )}>

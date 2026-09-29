@@ -16,6 +16,8 @@ import type { Repositorio } from "./types.js";
  *   config/comunicado, gabinetes/{tenantId}/config/comunicado
  *   gabinetes/{tenantId}/config/caderno         (+ /historico/{ts})
  *   gabinetes/{tenantId}/auditorias/{id}
+ *   gabinetes/{tenantId}/documentos/{chave}     (+ /historico/{ts})
+ *   gabinetes/{tenantId}/agenda/{id}
  * Todas as escritas usam { merge: true }. Nenhuma rotina de seed.
  */
 export function createFirestoreRepo(db: Firestore): Repositorio {
@@ -60,6 +62,16 @@ export function createFirestoreRepo(db: Firestore): Repositorio {
     caderno: {
       async get(t) { const s = await gab(t).collection("config").doc("caderno").get(); return s.exists ? (s.data() as any) : null; },
       async salvar(t, c) { await salvarComHistorico(gab(t).collection("config"), "caderno", c); },
+    },
+    documentos: {
+      async get(t, k) { const s = await gab(t).collection("documentos").doc(k).get(); return s.exists ? (s.data() as any) : null; },
+      async salvar(t, k, c) { await salvarComHistorico(gab(t).collection("documentos"), k, c); },
+    },
+    agenda: {
+      async listar(t, de, ate) { const q = await gab(t).collection("agenda").where("data", ">=", de).where("data", "<=", ate).get(); return q.docs.map((d) => d.data() as any); },
+      async get(t, id) { const s = await gab(t).collection("agenda").doc(id).get(); return s.exists ? (s.data() as any) : null; },
+      async salvar(t, e) { await gab(t).collection("agenda").doc(e.id).set(e, { merge: true }); },
+      async remover(t, id) { await gab(t).collection("agenda").doc(id).delete(); },
     },
     auditorias: {
       async registrar(t, a) { await gab(t).collection("auditorias").doc(a.id).set(a, { merge: true }); },

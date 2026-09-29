@@ -37,6 +37,28 @@ gabineteRouter.put("/caderno", requirePermission("gabinete:teses_editar"), async
   res.json(c);
 });
 
+// ───────── Documentos do gabinete (Guia do PROJUDI, configuração da agenda) ─────────
+const DOCUMENTOS = { guia_projudi: 200_000, agenda_config: 2_000 } as const;
+const chaveDoc = (v: unknown) => {
+  const k = String(v);
+  if (!(k in DOCUMENTOS)) throw new HttpError(404, "Documento inexistente.");
+  return k as keyof typeof DOCUMENTOS;
+};
+gabineteRouter.get("/documentos/:chave", async (req, res) => {
+  const k = chaveDoc(req.params.chave);
+  res.json((await repo().documentos.get(req.user!.tenantId, k)) ?? { texto: "", atualizadoPor: "", atualizadoEm: 0 });
+});
+gabineteRouter.put("/documentos/:chave", requirePermission("gabinete:teses_editar"), async (req, res) => {
+  const k = chaveDoc(req.params.chave);
+  const b = z.object({ texto: z.string().max(DOCUMENTOS[k]) }).parse(req.body);
+  if (k === "agenda_config" && b.texto && !/^https:\/\/calendar\.google\.com\/calendar\/(u\/\d+\/)?embed\?/.test(b.texto)) {
+    throw new HttpError(400, "Use o endereço de incorporação do Google Agenda (começa com https://calendar.google.com/calendar/embed?).");
+  }
+  const c = { texto: b.texto, atualizadoPor: req.user!.uid, atualizadoEm: Date.now() };
+  await repo().documentos.salvar(req.user!.tenantId, k, c);
+  res.json(c);
+});
+
 // ───────── Paradigmas ─────────
 gabineteRouter.get("/paradigmas", requirePermission("minuta:gerar"), async (req, res) => {
   res.json(await repo().paradigmas.listar(req.user!.tenantId));

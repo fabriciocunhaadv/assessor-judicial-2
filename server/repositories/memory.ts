@@ -1,4 +1,4 @@
-import type { Caderno, RegistroAuditoria, Comunicado, Convite, Gabinete, Paradigma, PrecedenteSalvo, PromptGabinete, RegistroMinuta, RegistroUso, Repositorio, Tese, Unidade, Usuario } from "./types.js";
+import type { EventoAgenda, Caderno, RegistroAuditoria, Comunicado, Convite, Gabinete, Paradigma, PrecedenteSalvo, PromptGabinete, RegistroMinuta, RegistroUso, Repositorio, Tese, Unidade, Usuario } from "./types.js";
 
 /** Repositório em memória — apenas desenvolvimento e testes. */
 export function createMemoryRepo(): Repositorio {
@@ -14,6 +14,8 @@ export function createMemoryRepo(): Repositorio {
   const gabinetes = new Map<string, Gabinete>();
   const comunicados = new Map<string, Comunicado>();
   const cadernos = new Map<string, Caderno>();
+  const documentos = new Map<string, Caderno>();
+  const agenda = new Map<string, Map<string, EventoAgenda>>();
   const auditorias = new Map<string, RegistroAuditoria[]>();
   const bucket = <T>(m: Map<string, Map<string, T>>, k: string) => {
     if (!m.has(k)) m.set(k, new Map());
@@ -50,6 +52,16 @@ export function createMemoryRepo(): Repositorio {
     caderno: {
       async get(t) { return cadernos.get(t) ?? null; },
       async salvar(t, c) { cadernos.set(t, c); },
+    },
+    documentos: {
+      async get(t, k) { return documentos.get(`${t}/${k}`) ?? null; },
+      async salvar(t, k, c) { documentos.set(`${t}/${k}`, c); },
+    },
+    agenda: {
+      async listar(t, de, ate) { return [...bucket(agenda, t).values()].filter((e) => e.data >= de && e.data <= ate); },
+      async get(t, id) { return bucket(agenda, t).get(id) ?? null; },
+      async salvar(t, e) { bucket(agenda, t).set(e.id, e); },
+      async remover(t, id) { bucket(agenda, t).delete(id); },
     },
     auditorias: {
       async registrar(t, a) { auditorias.set(t, [a, ...(auditorias.get(t) ?? [])]); },
