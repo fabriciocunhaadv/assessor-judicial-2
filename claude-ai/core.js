@@ -238,5 +238,42 @@
     return { corrigido, juros, total: round2(corrigido + juros), jurosPct, memoria };
   }
 
-  root.AJ = { cleanPages, isNoiseLine, verificarFidelidade, paragrafosDensos, secao, normalizarDossie, mergeDossies, resumoExecutivo, pedidosNaoApreciados, chunkText, bytes, hashId, normalizarPrecedente, rankPrecedentes, parseSeries, calcularConsectarios, loc };
+  // ───────── Prazos processuais (CPC, arts. 219, 220 e 224) — mesma regra de shared/prazos.ts ─────────
+  const FERIADOS = { "01-01": "Confraternização Universal", "04-21": "Tiradentes", "05-01": "Dia do Trabalho", "09-07": "Independência do Brasil", "10-12": "Nossa Senhora Aparecida", "11-02": "Finados", "11-15": "Proclamação da República", "11-20": "Dia Nacional de Zumbi e da Consciência Negra", "12-25": "Natal" };
+  const isoD = (d) => d.toISOString().slice(0, 10);
+  const maisDias = (d, n) => new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() + n));
+  function parseData(s) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) throw new Error(`Data inválida: "${s}". Use AAAA-MM-DD.`);
+    const [y, m, d] = s.split("-").map(Number); const dt = new Date(Date.UTC(y, m - 1, d));
+    if (isoD(dt) !== s) throw new Error(`Data inexistente: "${s}".`);
+    return dt;
+  }
+  function motivoNaoUtil(d, extras) {
+    const dow = d.getUTCDay();
+    if (dow === 0) return "domingo";
+    if (dow === 6) return "sábado";
+    const mmdd = isoD(d).slice(5), m = d.getUTCMonth() + 1, dia = d.getUTCDate();
+    if (FERIADOS[mmdd]) return `feriado nacional — ${FERIADOS[mmdd]}`;
+    if ((m === 12 && dia >= 20) || (m === 1 && dia <= 20)) return "recesso forense (art. 220 do CPC)";
+    if (extras.has(isoD(d))) return "sem expediente (informado)";
+    return null;
+  }
+  /** Exclui o dia do começo, inclui o do vencimento; começo e vencimento em dia sem expediente vão para o próximo dia útil. */
+  function calcularPrazo(intimacao, dias, extrasSemExpediente = [], uteis = true) {
+    if (!Number.isInteger(dias) || dias < 1 || dias > 3650) throw new Error("Informe um prazo entre 1 e 3650 dias.");
+    const extras = new Set(extrasSemExpediente.map((x) => isoD(parseData(x.trim()))));
+    const ignorados = []; let d = maisDias(parseData(intimacao), 1), m;
+    while ((m = motivoNaoUtil(d, extras))) { ignorados.push({ data: isoD(d), motivo: m }); d = maisDias(d, 1); }
+    const inicioContagem = isoD(d);
+    let contados = 1;
+    while (contados < dias) {
+      d = maisDias(d, 1);
+      const mot = uteis ? motivoNaoUtil(d, extras) : null;
+      if (mot) ignorados.push({ data: isoD(d), motivo: mot }); else contados++;
+    }
+    while ((m = motivoNaoUtil(d, extras))) { ignorados.push({ data: isoD(d), motivo: m }); d = maisDias(d, 1); }
+    return { inicioContagem, vencimento: isoD(d), diasCorridos: Math.round((d - parseData(intimacao)) / 86400000), ignorados };
+  }
+
+  root.AJ = { cleanPages, isNoiseLine, verificarFidelidade, paragrafosDensos, secao, normalizarDossie, mergeDossies, resumoExecutivo, pedidosNaoApreciados, chunkText, bytes, hashId, normalizarPrecedente, rankPrecedentes, parseSeries, calcularConsectarios, loc, calcularPrazo };
 })(typeof window !== "undefined" ? window : globalThis);
