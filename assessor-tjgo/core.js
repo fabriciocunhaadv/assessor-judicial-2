@@ -48,8 +48,40 @@
     return p + "\n\n" + m + n;
   }
 
-  /** Texto corrido, com marcadores ⟦Pág. N⟧ discretos na virada de página (tríplice localização). */
-  function cleanPages(rawPages, keepMarkers = true) {
+  // ───────── Tríplice localização (Movimentação / Arquivo / Página do arquivo) ─────────
+  // O PDF consolidado do PROJUDI traz em cada página o carimbo com a movimentação e o arquivo.
+  // Lê o carimbo nas bordas da página ANTES da limpeza (que o remove como ruído).
+  const RE_MOV = /\bMov(?:imenta[çc][ãa]o|imento|\.)?\s*(?:n[º°o.]?\s*)?[:\-]?\s*(\d{1,4})\b/i;
+  const RE_ARQ = /\bArq(?:uivo|\.)?\s*(?:n[º°o.]?\s*)?[:\-]?\s*(\d{1,3})\b/i;
+  const RE_PAG = /\bP[áa]g(?:ina|\.)?\s*[:\-]?\s*(\d{1,4})\s*(?:de|\/)\s*(\d{1,4})\b/i;
+  function detectarLocais(rawPages) {
+    const out = []; let ant = null;
+    rawPages.forEach((txt, i) => {
+      const linhas = String(txt).split("\n").map((l) => l.trim()).filter(Boolean);
+      const bordas = [...linhas.slice(0, 8), ...linhas.slice(-8)];
+      let mov = null, arq = null, pag = null, tot = null;
+      for (const l of bordas) {
+        const m = RE_MOV.exec(l), a = RE_ARQ.exec(l);
+        if (m && a) { mov = m[1]; arq = a[1]; const pg = RE_PAG.exec(l); if (pg) { pag = pg[1]; tot = pg[2]; } break; }
+      }
+      // "Página X de Y" fora do carimbo só vale se não for a numeração do PDF inteiro.
+      if (mov && !pag) for (const l of bordas) { const pg = RE_PAG.exec(l); if (pg && Number(pg[2]) !== rawPages.length) { pag = pg[1]; tot = pg[2]; break; } }
+      let loc;
+      if (mov) {
+        // Sem "Página X de Y" no carimbo: conta as páginas do mesmo arquivo em sequência.
+        const mesmo = ant && ant.mov === mov && ant.arq === arq;
+        loc = { mov, arq, pag: pag || String(mesmo ? Number(ant.pag) + 1 : 1), tot, pdf: i + 1, lido: true };
+      } else if (ant) loc = { mov: ant.mov, arq: ant.arq, pag: String(Number(ant.pag) + 1), tot: ant.tot, pdf: i + 1, lido: false };
+      else loc = { pdf: i + 1, lido: false };
+      out.push(loc); if (loc.mov) ant = loc;
+    });
+    const lidos = out.filter((l) => l.lido).length;
+    return { locais: out, cobertura: rawPages.length ? lidos / rawPages.length : 0 };
+  }
+  const marcador = (loc) => (loc && loc.mov ? `⟦Mov. ${loc.mov} · Arq. ${loc.arq} · Pág. ${loc.pag} | PDF ${loc.pdf}⟧` : `⟦PDF ${loc ? loc.pdf : "?"}⟧`);
+
+  /** Texto corrido, com marcadores discretos na virada de página: ⟦Mov. X · Arq. Y · Pág. Z | PDF N⟧ quando o carimbo existe. */
+  function cleanPages(rawPages, keepMarkers = true, locais = null) {
     const pages = rawPages.map((p) => p.replace(/\r\n?/g, "\n").split("\n"));
     const repeated = detectRepeatedEdges(pages);
     const cleaned = pages.map((lines) => {
@@ -65,7 +97,7 @@
       return kept.join("\n").replace(/\n{3,}/g, "\n\n").trim();
     });
     let out = "";
-    cleaned.forEach((t, i) => { out = joinAcrossPages(out, t, keepMarkers ? `⟦Pág. ${i + 1}⟧` : ""); });
+    cleaned.forEach((t, i) => { out = joinAcrossPages(out, t, !keepMarkers ? "" : locais ? marcador(locais[i]) : `⟦Pág. ${i + 1}⟧`); });
     return out.trim();
   }
 
@@ -275,5 +307,5 @@
     return { inicioContagem, vencimento: isoD(d), diasCorridos: Math.round((d - parseData(intimacao)) / 86400000), ignorados };
   }
 
-  root.AJ = { cleanPages, isNoiseLine, verificarFidelidade, paragrafosDensos, secao, normalizarDossie, mergeDossies, resumoExecutivo, pedidosNaoApreciados, chunkText, bytes, hashId, normalizarPrecedente, rankPrecedentes, parseSeries, calcularConsectarios, loc, calcularPrazo };
+  root.AJ = { cleanPages, isNoiseLine, verificarFidelidade, paragrafosDensos, secao, normalizarDossie, mergeDossies, resumoExecutivo, pedidosNaoApreciados, chunkText, bytes, hashId, normalizarPrecedente, rankPrecedentes, parseSeries, calcularConsectarios, loc, calcularPrazo, detectarLocais };
 })(typeof window !== "undefined" ? window : globalThis);
