@@ -1,0 +1,274 @@
+<title>Assessor TJGO</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Mesa de trabalho do assessor: autos (PDF) | minuta | chat. Em telas estreitas, os três painéis viram abas. */
+:root {
+  --bg: #FAFAF9; --surface: #FFFFFF; --sunk: #F5F5F4; --ink: #1C1917; --muted: #78716C; --line: #E7E5E4;
+  --accent: #B5532F; --accent-soft: #FBE9E1; --btn: #B5532F; --btn-hover: #963F22;
+  --ok: #15803D; --ok-soft: #DCFCE7; --warn: #A16207; --warn-soft: #FEF3C7; --bad: #B91C1C; --bad-soft: #FEE2E2;
+  --ref: #2F5470; --ref-soft: #E3EBF2;
+  --top: #0C0A09; --top-ink: #F5F5F4; --top-muted: #A8A29E; --top-line: #292524;
+  --f-ui: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-doc: "Source Serif 4", Georgia, "Times New Roman", serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0C0A09; --surface: #1C1917; --sunk: #292524; --ink: #F5F5F4; --muted: #A8A29E; --line: #292524;
+  --accent: #E58C6C; --accent-soft: #3A1F15;
+  --ok: #86EFAC; --ok-soft: #14301F; --warn: #FCD34D; --warn-soft: #3A2E10; --bad: #FCA5A5; --bad-soft: #3D1D1A;
+  --ref: #8FB4D0; --ref-soft: #1C2A36; color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg: #0C0A09; --surface: #1C1917; --sunk: #292524; --ink: #F5F5F4; --muted: #A8A29E; --line: #292524;
+  --accent: #E58C6C; --accent-soft: #3A1F15;
+  --ok: #86EFAC; --ok-soft: #14301F; --warn: #FCD34D; --warn-soft: #3A2E10; --bad: #FCA5A5; --bad-soft: #3D1D1A;
+  --ref: #8FB4D0; --ref-soft: #1C2A36; color-scheme: dark; }
+
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.5 var(--f-ui); }
+h1, h2, h3 { margin: 0; text-wrap: balance; }
+button, input, select, textarea { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+[hidden] { display: none !important; }
+
+/* Topo */
+.top { position: sticky; top: 0; z-index: 5; background: var(--top); color: var(--top-ink); }
+.top-in { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; padding: 10px 16px; }
+.brand { display: flex; align-items: center; gap: 10px; }
+.logo { width: 34px; height: 34px; border-radius: 8px; background: #B5532F; display: grid; place-items: center; color: #fff; flex: none; }
+.brand h1 { font-size: 16px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+.chip-claude { font: 700 10px/1 var(--f-ui); padding: 3px 6px; border-radius: 4px; background: rgb(217 119 87 / .25); color: #F5D0BF; }
+nav.menu { display: flex; gap: 4px; }
+nav.menu button { border: 0; background: none; color: var(--top-muted); padding: 7px 12px; border-radius: 8px; cursor: pointer; font-weight: 500; }
+nav.menu button:hover { color: var(--top-ink); background: #1C1917; }
+nav.menu button[aria-selected="true"] { color: #fff; background: #B5532F; }
+.status { margin-left: auto; display: flex; gap: 6px; flex-wrap: wrap; }
+.pill { display: inline-flex; align-items: center; gap: 6px; padding: 2px 9px; border-radius: 999px; font-size: 12px; background: var(--sunk); color: var(--muted); white-space: nowrap; }
+.pill::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.top .pill { background: #1C1917; box-shadow: inset 0 0 0 1px var(--top-line); color: var(--top-muted); }
+.pill.ok { background: var(--ok-soft); color: var(--ok); } .pill.warn { background: var(--warn-soft); color: var(--warn); } .pill.bad { background: var(--bad-soft); color: var(--bad); }
+.top .pill.ok, .top .pill.warn, .top .pill.bad { background: #1C1917; }
+.top .pill.ok { color: #86EFAC; } .top .pill.warn { color: #FCD34D; } .top .pill.bad { color: #FCA5A5; }
+
+main { padding: 16px; }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; min-width: 0; box-shadow: 0 1px 2px rgb(0 0 0 / .05); display: flex; flex-direction: column; }
+.panel > header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 14px; border-bottom: 1px solid var(--line); }
+.panel > header h2 { font-size: 14px; font-weight: 600; }
+.body { padding: 14px; display: grid; gap: 12px; min-width: 0; }
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.muted { color: var(--muted); } .small { font-size: 12.5px; }
+.stack { display: grid; gap: 12px; }
+label.f { display: grid; gap: 4px; font-size: 12.5px; color: var(--muted); }
+input[type=text], input[type=number], select, textarea { width: 100%; background: var(--surface); border: 1px solid color-mix(in srgb, var(--muted) 45%, var(--line)); border-radius: 8px; padding: 8px 10px; color: var(--ink); }
+textarea { resize: vertical; line-height: 1.5; }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; border-radius: 8px; padding: 8px 14px; border: 1px solid var(--btn); background: var(--btn); color: #fff; font-weight: 500; cursor: pointer; }
+.btn:not(:disabled):hover { background: var(--btn-hover); border-color: var(--btn-hover); }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+.btn.quiet { background: transparent; border-color: var(--line); color: var(--ink); }
+.btn.quiet:not(:disabled):hover { background: var(--sunk); border-color: var(--line); }
+.btn.ghost { background: transparent; border-color: var(--accent); color: var(--accent); }
+.btn.ghost:not(:disabled):hover { background: var(--accent-soft); border-color: var(--accent); }
+.btn.danger { background: transparent; border-color: var(--bad); color: var(--bad); }
+.btn.danger:not(:disabled):hover { background: var(--bad-soft); border-color: var(--bad); }
+.btn.sm { padding: 4px 10px; font-size: 12.5px; }
+.seg { display: flex; flex-wrap: wrap; gap: 4px; background: var(--sunk); border-radius: 8px; padding: 4px; }
+.seg button { flex: 1; border: 0; background: none; border-radius: 6px; padding: 6px 10px; font-size: 12.5px; font-weight: 500; color: var(--muted); cursor: pointer; white-space: nowrap; }
+.seg button[aria-checked="true"] { background: var(--surface); color: var(--accent); box-shadow: 0 1px 2px rgb(0 0 0 / .1); }
+.err { padding: 10px 12px; border-radius: 8px; background: var(--bad-soft); color: var(--bad); font-size: 13px; }
+.info { padding: 10px 12px; border-radius: 8px; background: var(--accent-soft); font-size: 13px; }
+.tag { display: inline-block; padding: 1px 7px; border-radius: 4px; font: 500 11px/1.6 var(--f-mono); background: var(--sunk); color: var(--muted); }
+.claude-chip { display: inline-flex; gap: 4px; padding: 1px 8px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); font-size: 11px; font-weight: 700; }
+.claude-chip::before { content: "✦"; }
+
+/* Barra do processo */
+.proc { display: grid; grid-template-columns: minmax(0, 300px) minmax(0, 1fr) auto; gap: 12px 16px; align-items: end; padding: 14px; }
+@media (max-width: 1100px) { .proc { grid-template-columns: minmax(0, 1fr); } }
+.drop { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1.5px dashed var(--line); border-radius: 10px; background: var(--sunk); cursor: pointer; min-width: 0; }
+.drop:hover, .drop.over { border-color: var(--accent); }
+.drop strong { display: block; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.drop span { font-size: 12px; color: var(--muted); }
+.params { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr); gap: 10px; }
+@media (max-width: 700px) { .params { grid-template-columns: minmax(0, 1fr); } }
+.bar { height: 4px; border-radius: 2px; background: var(--sunk); overflow: hidden; } .bar > i { display: block; height: 100%; background: var(--btn); width: 0; transition: width .2s; }
+.steps { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12.5px; color: var(--muted); padding: 0 14px 12px; }
+.steps span::before { content: "○ "; } .steps .run { color: var(--ink); } .steps .run::before { content: "◐ "; color: var(--accent); }
+.steps .done::before { content: "● "; color: var(--ok); } .steps .fail::before { content: "● "; color: var(--bad); }
+
+/* Mesa de trabalho */
+.paneswitch { display: none; margin: 12px 0; }
+.mesa { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr) minmax(0, 1fr); gap: 12px; margin-top: 12px; height: calc(100vh - 250px); min-height: 520px; }
+.mesa > .panel { overflow: hidden; }
+.scroll { overflow: auto; flex: 1; min-height: 0; }
+@media (max-width: 1280px) {
+  .paneswitch { display: flex; }
+  .mesa { grid-template-columns: minmax(0, 1fr); height: auto; min-height: 0; }
+  .mesa > .panel { display: none; max-height: none; }
+  .mesa > .panel.on { display: flex; }
+  .mesa .scroll { max-height: 75vh; }
+}
+
+/* Autos */
+.pdfbox { background: var(--sunk); display: grid; place-items: start center; padding: 8px; }
+.pdfbox canvas { max-width: 100%; height: auto; display: block; box-shadow: 0 1px 3px rgb(0 0 0 / .2); background: #fff; }
+.pdfbox pre { white-space: pre-wrap; font: 13px/1.55 var(--f-doc); margin: 0; padding: 10px; background: var(--surface); width: 100%; }
+.pgnav { display: flex; gap: 6px; align-items: center; }
+.pgnav input { width: 64px; padding: 4px 6px; text-align: center; }
+.hits { display: grid; gap: 2px; max-height: 150px; overflow: auto; font-size: 12.5px; }
+.hits button { text-align: left; background: none; border: 0; padding: 4px 6px; border-radius: 4px; cursor: pointer; color: var(--ink); }
+.hits button:hover { background: var(--sunk); }
+mark { background: var(--warn-soft); color: var(--ink); }
+
+/* Minuta */
+.folha { font: 15.5px/1.72 var(--f-doc); color: var(--ink); overflow-wrap: anywhere; }
+.folha h1 { font-size: 18px; margin: 0 0 12px; }
+.folha h2 { font: 700 14.5px/1.4 var(--f-doc); text-transform: uppercase; letter-spacing: .06em; text-align: center; margin: 24px 0 10px; }
+.folha h3 { font: 600 15px/1.4 var(--f-doc); margin: 18px 0 8px; }
+.folha p { margin: 0 0 11px; text-align: justify; hyphens: auto; }
+.folha p.cit { margin-left: 4ch; font-size: 14.5px; font-style: italic; }
+.folha ul { margin: 0 0 11px; padding-left: 22px; }
+.claude-out { border-left: 4px solid var(--accent); padding-left: 14px; }
+.ref { font: 500 .78em/1 var(--f-mono); background: var(--ref-soft); color: var(--ref); padding: 1px 3px; border-radius: 3px; white-space: nowrap; }
+button.ref { border: 0; cursor: pointer; }
+.pid { font: 600 .78em/1 var(--f-mono); color: var(--accent); }
+.editor { width: 100%; min-height: 60vh; font: 14.5px/1.65 var(--f-doc); border: 0; padding: 14px; resize: none; }
+.checks { display: grid; gap: 6px; }
+.check { display: flex; justify-content: space-between; gap: 8px; align-items: center; font-size: 13px; }
+.notes { font-size: 12.5px; display: grid; gap: 3px; } .notes .bad { color: var(--bad); } .notes .warn { color: var(--warn); }
+.subtabs { display: flex; gap: 2px; padding: 0 10px; border-bottom: 1px solid var(--line); overflow-x: auto; }
+.subtabs button { flex: none; border: 0; background: none; padding: 8px 10px; font-size: 12.5px; font-weight: 500; color: var(--muted); border-bottom: 2px solid transparent; cursor: pointer; }
+.subtabs button[aria-selected="true"] { color: var(--accent); border-bottom-color: var(--accent); }
+.placeholder { color: var(--muted); font-size: 14px; display: grid; gap: 8px; }
+
+/* Chat */
+.msgs { display: grid; gap: 12px; align-content: start; }
+.msg { overflow-wrap: anywhere; min-width: 0; font-size: 13.5px; }
+.msg.user { justify-self: end; max-width: 85%; background: var(--sunk); padding: 8px 12px; border-radius: 10px 10px 2px 10px; white-space: pre-wrap; }
+.msg.bot { border: 1px solid var(--line); border-left: 4px solid var(--accent); border-radius: 10px; padding: 10px 12px; }
+.msg.bot .folha { font-size: 14px; }
+.msg details { margin-top: 8px; border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; }
+.msg details summary { cursor: pointer; font-size: 12.5px; font-weight: 600; color: var(--accent); }
+.tool-note { font-size: 12px; color: var(--muted); font-style: italic; margin: 6px 0 0; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chips button { border: 1px solid var(--line); background: var(--surface); color: var(--ink); border-radius: 999px; padding: 3px 10px; font-size: 12px; cursor: pointer; }
+.chips button:hover { border-color: var(--accent); color: var(--accent); }
+.composer { border-top: 1px solid var(--line); padding: 10px 12px; display: grid; gap: 8px; }
+
+/* Listas */
+.items { display: grid; gap: 8px; }
+.item { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; display: grid; gap: 6px; }
+.item p { margin: 0; font-size: 13.5px; }
+.item .row { justify-content: space-between; }
+.grid2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 420px); gap: 16px; align-items: start; }
+@media (max-width: 1000px) { .grid2 { grid-template-columns: minmax(0, 1fr); } }
+.page-h { margin-bottom: 14px; } .page-h h2 { font-size: 18px; font-weight: 600; } .page-h p { margin: 2px 0 0; color: var(--muted); font-size: 13.5px; }
+.warnbox { padding: 10px 12px; border-radius: 8px; background: var(--warn-soft); font-size: 13px; }
+#toast { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 8px 14px; border-radius: 8px; font-size: 13px; z-index: 9; }
+@media (max-width: 700px) { .status { display: none; } .brand small { display: none; } }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<header class="top">
+  <div class="top-in">
+    <div class="brand">
+      <div class="logo"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m14 13-7.5 7.5a2.12 2.12 0 0 1-3-3L11 10"/><path d="m16 16 6-6M8 8l6-6M9 7l8 8M21 11l-8-8"/></svg></div>
+      <h1>Assessor TJGO <span class="chip-claude">com Claude</span></h1>
+    </div>
+    <nav class="menu" role="tablist" aria-label="Telas">
+      <button role="tab" id="t-processo" aria-controls="processo" aria-selected="true">Processo</button>
+      <button role="tab" id="t-prompts" aria-controls="prompts" aria-selected="false">Prompts</button>
+      <button role="tab" id="t-historico" aria-controls="historico" aria-selected="false">Histórico</button>
+    </nav>
+    <div class="status"><span class="pill" id="st-claude">Claude: conectando…</span><span class="pill" id="st-db">Dados: conectando…</span></div>
+  </div>
+</header>
+
+<main>
+  <!-- PROCESSO -->
+  <section role="tabpanel" id="processo" aria-labelledby="t-processo">
+    <div class="panel">
+      <div class="proc">
+        <div class="stack" style="gap:6px">
+          <label class="drop" id="drop" for="f-autos">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex:none;color:var(--accent)"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M12 18v-6M9 15l3-3 3 3"/></svg>
+            <div style="min-width:0"><strong id="drop-t">Anexar os autos em PDF</strong><span id="drop-s">PROJUDI, PJe ou eproc · lidos aqui no navegador</span></div>
+            <input type="file" id="f-autos" accept="application/pdf" hidden>
+          </label>
+          <div class="bar" id="leitura-bar" hidden><i></i></div>
+          <button class="btn quiet sm" id="b-exemplo" type="button">Usar autos de exemplo (fictícios)</button>
+        </div>
+        <div class="params">
+          <label class="f" for="s-prompt">Prompt<select id="s-prompt"><option value="">Padrão do sistema</option></select></label>
+          <div class="f" style="display:grid;gap:4px;font-size:12.5px;color:var(--muted)"><span>Tipo de ato</span>
+            <div class="seg" id="seg-ato" role="radiogroup" aria-label="Tipo de ato">
+              <button type="button" role="radio" data-v="auto" aria-checked="true">Auto</button><button type="button" role="radio" data-v="sentenca" aria-checked="false">Sentença</button><button type="button" role="radio" data-v="decisao" aria-checked="false">Decisão</button><button type="button" role="radio" data-v="despacho" aria-checked="false">Despacho</button><button type="button" role="radio" data-v="embargos" aria-checked="false">Embargos</button>
+            </div></div>
+          <label class="f" for="t-instrucao" style="grid-column:1/-1">Orientação para este caso (opcional)<input type="text" id="t-instrucao" placeholder="Ex.: examinar a impugnação da assinatura do contrato (Tema 1.061/STJ)"></label>
+        </div>
+        <div class="row" style="align-self:end"><button class="btn" id="b-gerar" type="button" disabled>Gerar minuta</button><button class="btn danger" id="b-parar" type="button" hidden>Parar</button></div>
+      </div>
+      <div class="steps" id="steps" hidden><span data-s="1">Etapa 1 — leitura dos autos</span><span data-s="2">Etapa 2 — redação da minuta</span><span data-s="3">Conferência</span></div>
+      <div id="gerar-err" style="padding:0 14px"></div>
+    </div>
+
+    <div class="seg paneswitch" id="paneswitch" role="radiogroup" aria-label="Painel">
+      <button type="button" role="radio" data-p="p-autos" aria-checked="false">Autos</button><button type="button" role="radio" data-p="p-minuta" aria-checked="true">Minuta</button><button type="button" role="radio" data-p="p-chat" aria-checked="false">Chat</button>
+    </div>
+
+    <div class="mesa">
+      <div class="panel" id="p-autos"><header><h2>Autos</h2>
+          <div class="pgnav"><button class="btn quiet sm" id="pg-prev" type="button" aria-label="Página anterior">‹</button><input type="number" id="pg-n" min="1" value="1" aria-label="Página"><span class="small muted" id="pg-total">de —</span><button class="btn quiet sm" id="pg-next" type="button" aria-label="Próxima página">›</button></div></header>
+        <div class="body" style="padding:10px 12px"><input type="text" id="busca" placeholder="Buscar nos autos (mín. 3 letras)"><div class="hits" id="hits"></div></div>
+        <div class="scroll pdfbox" id="pdfbox"><p class="muted small" style="padding:20px">Anexe os autos para vê-los aqui.</p></div>
+      </div>
+
+      <div class="panel on" id="p-minuta"><header><h2 id="minuta-h">Minuta</h2><div class="row" id="minuta-acts"></div></header>
+        <div class="subtabs" id="min-tabs" role="tablist" aria-label="Minuta"><button type="button" data-v="texto" aria-selected="true">Texto</button><button type="button" data-v="conf" aria-selected="false">Conferência</button><button type="button" data-v="editar" aria-selected="false">Editar</button></div>
+        <div class="scroll"><div class="body" id="min-view"></div><textarea class="editor" id="editor" hidden aria-label="Editar minuta"></textarea></div>
+      </div>
+
+      <div class="panel" id="p-chat"><header><h2>Chat com a minuta</h2><button class="btn quiet sm" id="b-chat-nova" type="button">Nova conversa</button></header>
+        <div class="scroll"><div class="body msgs" id="msgs"></div></div>
+        <div class="composer">
+          <div class="chips" id="chips">
+            <button type="button" data-p="Faça um resumo objetivo da minuta: resultado de cada pedido, fundamentos principais e condenações.">Resumir</button>
+            <button type="button" data-p="Reanalise nos autos o seguinte documento e diga se a minuta o considerou corretamente: " data-edit="1">Reanalisar documento…</button>
+            <button type="button" data-p="Melhore a fundamentação: aprofunde o confronto com as provas e a subsunção, sem acrescentar fatos que não estejam nos autos.">Melhorar fundamentação</button>
+            <button type="button" data-p="Confira se todos os pedidos de cada parte foram julgados no dispositivo e aponte o que faltar.">Conferir pedidos</button>
+            <button type="button" data-p="Revise português, clareza e coesão da minuta, sem mudar o conteúdo jurídico.">Revisar linguagem</button>
+          </div>
+          <div class="row" style="align-items:stretch;flex-wrap:nowrap"><textarea id="t-msg" rows="2" style="flex:1;min-width:0" placeholder="Pergunte ou peça um ajuste (Ctrl+Enter envia)"></textarea>
+            <div class="stack" style="gap:6px"><button class="btn" id="b-enviar" type="button" disabled>Enviar</button><button class="btn danger sm" id="b-chat-parar" type="button" hidden>Parar</button></div></div>
+          <div id="chat-err"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- PROMPTS -->
+  <section role="tabpanel" id="prompts" aria-labelledby="t-prompts" hidden>
+    <div class="page-h"><h2>Prompts</h2><p>Instruções do gabinete por matéria. O prompt escolhido no Processo entra na redação da minuta.</p></div>
+    <div class="grid2">
+      <div class="panel"><header><h2 id="pr-h">Prompts</h2><div class="row"><button class="btn quiet sm" id="pr-exp" type="button">Exportar</button><label class="btn quiet sm" for="pr-imp">Importar JSON<input type="file" id="pr-imp" accept="application/json,.json" hidden></label></div></header>
+        <div class="body"><input type="text" id="pr-q" placeholder="Filtrar prompts"><div class="items" id="pr-list"></div></div></div>
+      <div class="panel"><header><h2 id="pr-form-h">Novo prompt</h2></header><div class="body">
+        <form id="pr-form" class="stack">
+          <label class="f" for="pr-titulo">Título<input type="text" id="pr-titulo" required maxlength="160" placeholder="JEC — consumidor bancário"></label>
+          <label class="f" for="pr-area">Área<select id="pr-area"></select></label>
+          <label class="f" for="pr-texto">Instruções<textarea id="pr-texto" rows="12" required placeholder="1. Aplique os Enunciados do FONAJE pertinentes…"></textarea></label>
+          <div class="row"><button class="btn" type="submit">Salvar</button><button class="btn quiet" type="button" id="pr-limpar">Limpar</button></div>
+        </form></div></div>
+    </div>
+  </section>
+
+  <!-- HISTÓRICO -->
+  <section role="tabpanel" id="historico" aria-labelledby="t-historico" hidden>
+    <div class="page-h"><h2>Histórico</h2><p>Suas minutas e conversas, visíveis só para você. Os autos não são guardados: para ver as páginas de novo, anexe o PDF.</p></div>
+    <div class="panel"><div class="body"><input type="text" id="hist-q" placeholder="Buscar por número do processo ou arquivo"><div class="items" id="hist-list"></div></div></div>
+  </section>
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="core.js"></script>
+<script src="prompts.js"></script>
+<script src="app.js"></script>
