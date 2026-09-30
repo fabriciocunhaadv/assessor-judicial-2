@@ -91,6 +91,16 @@ textarea { resize: vertical; line-height: 1.5; }
 .params { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr); gap: 10px; }
 @media (max-width: 700px) { .params { grid-template-columns: minmax(0, 1fr); } }
 .bar { height: 4px; border-radius: 2px; background: var(--sunk); overflow: hidden; } .bar > i { display: block; height: 100%; background: var(--btn); width: 0; transition: width .2s; }
+.prog { margin: 0 14px 12px; padding: 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--sunk); display: grid; gap: 8px; }
+.prog-h { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px; font-size: 13.5px; }
+.bar.big { height: 8px; border-radius: 4px; background: var(--line); }
+.blocos { display: flex; flex-wrap: wrap; gap: 4px; }
+.blocos span { width: 26px; height: 22px; border-radius: 5px; display: grid; place-items: center; font: 600 10.5px/1 var(--f-mono); background: var(--surface); color: var(--muted); border: 1px solid var(--line); }
+.blocos .run { border-color: var(--accent); color: var(--accent); animation: pulso 1.2s ease-in-out infinite; }
+.blocos .done { background: var(--ok-soft); color: var(--ok); border-color: transparent; }
+.blocos .fail { background: var(--bad-soft); color: var(--bad); border-color: transparent; }
+@keyframes pulso { 50% { opacity: .45; } }
+#prog-agora { margin: 0; } #prog-dica { margin: 0; }
 .steps { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12.5px; color: var(--muted); padding: 0 14px 12px; }
 .steps span::before { content: "○ "; } .steps .run { color: var(--ink); } .steps .run::before { content: "◐ "; color: var(--accent); }
 .steps .done::before { content: "● "; color: var(--ok); } .steps .fail::before { content: "● "; color: var(--bad); }
@@ -207,7 +217,13 @@ button.ref { border: 0; cursor: pointer; }
         </div>
         <div class="row" style="align-self:end"><button class="btn" id="b-gerar" type="button" disabled>Gerar minuta</button><button class="btn danger" id="b-parar" type="button" hidden>Parar</button></div>
       </div>
-      <div class="steps" id="steps" hidden><span data-s="1">Etapa 1 — leitura dos autos</span><span data-s="2">Etapa 2 — redação da minuta</span><span data-s="3">Conferência</span></div>
+      <div class="prog" id="prog" hidden>
+        <div class="prog-h"><strong id="prog-t">Etapa 1 de 2 · Leitura dos autos</strong><span class="muted small" id="prog-tempo"></span></div>
+        <div class="bar big"><i id="prog-bar"></i></div>
+        <div class="blocos" id="prog-blocos" aria-label="Blocos dos autos"></div>
+        <p class="small" id="prog-agora"></p>
+        <p class="muted small" id="prog-dica">Pode usar as outras abas enquanto isso; só não feche nem recarregue a página.</p>
+      </div>
       <div id="gerar-err" style="padding:0 14px"></div>
     </div>
 

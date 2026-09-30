@@ -211,48 +211,130 @@
   });
   $("#s-prompt").addEventListener("change", (e) => { S.promptId = e.target.value; lembrar("tj.prompt", S.promptId); });
 
-  // ───────── Geração em duas etapas ─────────
-  const steps = $("#steps");
-  const setStep = (n, st, extra) => { const el = steps.querySelector(`[data-s="${n}"]`); el.className = st; const base = el.dataset.base || (el.dataset.base = el.textContent); el.textContent = extra ? `${base} · ${extra}` : base; };
+  // ───────── Geração em duas etapas, com progresso visível ─────────
+  // Autos grandes (milhares de páginas) são lidos em blocos, 3 ao mesmo tempo. Cada bloco lido fica guardado no caso:
+  // se a geração parar ou falhar, "Gerar minuta" continua de onde parou.
+  const PARALELO = 3;
+  const PROG = { ini: 0, timer: null, blocos: [], duracoes: [], etapa: 1, agora: "" };
+  const fmtTempo = (ms) => { const s = Math.max(0, Math.round(ms / 1000)); return s < 60 ? `${s}s` : `${Math.floor(s / 60)} min ${String(s % 60).padStart(2, "0")}s`; };
+  function renderProg() {
+    const n = PROG.blocos.length, feitos = PROG.blocos.filter((x) => x === "done").length, dec = Date.now() - PROG.ini;
+    if (PROG.etapa === 1) {
+      $("#prog-t").textContent = `Etapa 1 de 2 · Leitura dos autos — ${feitos} de ${n} bloco(s)`;
+      const media = PROG.duracoes.length ? PROG.duracoes.reduce((a, b) => a + b, 0) / PROG.duracoes.length : 0;
+      const resta = media ? (media * (n - feitos)) / PARALELO : 0;
+      $("#prog-tempo").textContent = `${fmtTempo(dec)} decorridos${resta ? ` · cerca de ${fmtTempo(resta)} restantes` : ""}`;
+      $("#prog-bar").style.width = `${n ? (100 * feitos) / n * 0.8 : 0}%`;
+    } else if (PROG.etapa === 2) {
+      $("#prog-t").textContent = "Etapa 2 de 2 · Redação da minuta";
+      $("#prog-tempo").textContent = `${fmtTempo(dec)} decorridos`;
+      $("#prog-bar").style.width = "90%";
+    } else {
+      $("#prog-t").textContent = PROG.etapa === 3 ? "Minuta pronta" : "Geração interrompida";
+      $("#prog-tempo").textContent = `${fmtTempo(dec)} no total`;
+      $("#prog-bar").style.width = PROG.etapa === 3 ? "100%" : $("#prog-bar").style.width;
+    }
+    clear($("#prog-blocos"), n > 1 ? PROG.blocos.map((st, i) => h("span", { class: st, title: `Bloco ${i + 1}: ${{ "": "na fila", run: "lendo", done: "lido", fail: "falhou" }[st]}`, text: String(i + 1) })) : []);
+    $("#prog-agora").textContent = PROG.agora;
+    $("#prog-dica").hidden = PROG.etapa > 2;
+  }
   $("#b-gerar").addEventListener("click", gerar);
   $("#b-parar").addEventListener("click", () => S.ctl && S.ctl.abort());
-  async function etapa1Bloco(bloco, i, n, signal, nivel) {
-    try { return [await ask(P.stage1(bloco, i, n), { json: true, signal })]; }
-    catch (e) {
-      if (e && e.code === "invalid_json" && nivel < 2 && bloco.length > 40000) {
-        const [a, b] = AJ.chunkText(bloco, Math.ceil(bloco.length / 2) + 2000);
-        return [...await etapa1Bloco(a, i, n, signal, nivel + 1), ...(b ? await etapa1Bloco(b, i, n, signal, nivel + 1) : [])];
+  const espera = (ms, signal) => new Promise((ok, no) => { const t = setTimeout(ok, ms); signal.addEventListener("abort", () => { clearTimeout(t); no({ code: "cancelled" }); }, { once: true }); });
+
+  async function lerBloco(bloco, i, n, signal, nivel, onText) {
+    for (let tentativa = 0; ; tentativa++) {
+      try { return [await ask(P.stage1(bloco, i, n), { json: true, signal, onText })]; }
+      catch (e) {
+        if (e && e.code === "invalid_json" && nivel < 2 && bloco.length > 40000) {
+          const [a, b] = AJ.chunkText(bloco, Math.ceil(bloco.length / 2) + 2000);
+          return [...await lerBloco(a, i, n, signal, nivel + 1, onText), ...(b ? await lerBloco(b, i, n, signal, nivel + 1, onText) : [])];
+        }
+        const transitorio = e && ["rate_limited", "upstream_error", "invalid_json"].includes(e.code);
+        if (!transitorio || tentativa >= 2) throw e;
+        PROG.agora = `Bloco ${i}: ${e.code === "rate_limited" ? "limite de uso momentâneo" : "falha temporária"} — tentando de novo em ${20 * (tentativa + 1)}s…`; renderProg();
+        await espera(20000 * (tentativa + 1), signal);
       }
-      throw e;
     }
   }
+
+  // O dossiê de autos enormes pode passar do limite de uma chamada: encurta transcrições e sínteses até caber.
+  function compactar(d, limite) {
+    let x = JSON.parse(JSON.stringify(d));
+    const cabe = () => AJ.bytes(JSON.stringify(x)) <= limite;
+    const passos = [
+      () => x.cronologia.forEach((e) => { e.transcricoes = L(e.transcricoes).slice(0, 1).map((t) => String(t).slice(0, 200)); }),
+      () => x.cronologia.forEach((e) => { e.resumo = String(e.resumo || "").slice(0, 300); }),
+      () => x.provas.forEach((p) => { p.descricao = String(p.descricao || "").slice(0, 200); }),
+      () => x.cronologia.forEach((e) => { e.transcricoes = []; e.resumo = String(e.resumo || "").slice(0, 160); }),
+      () => { x.cronologia = x.cronologia.filter((e) => !["certidao", "outro", "peticao_intercorrente"].includes(e.tipo)); },
+    ];
+    for (const p of passos) { if (cabe()) break; p(); }
+    if (!cabe()) x.alertas = [...L(x.alertas), "Dossiê resumido para caber no limite de uma chamada."];
+    return x;
+  }
+
   async function gerar() {
     const c = S.caso;
     showErr($("#gerar-err"), null);
     S.ctl = new AbortController(); const signal = S.ctl.signal;
-    $("#b-parar").hidden = false; steps.hidden = false; [1, 2, 3].forEach((n) => setStep(n, "")); renderBotoes();
-    let etapa = 1;
+    $("#b-parar").hidden = false; $("#prog").hidden = false; renderBotoes();
+    const blocos = AJ.chunkText(c.autos, STAGE1_CHARS);
+    if (!c.lidos || c.lidos.length !== blocos.length) c.lidos = new Array(blocos.length).fill(null);
+    Object.assign(PROG, { ini: Date.now(), etapa: 1, duracoes: [], agora: "", blocos: c.lidos.map((x) => (x ? "done" : "")) });
+    clearInterval(PROG.timer); PROG.timer = setInterval(renderProg, 1000); renderProg();
     try {
-      const blocos = AJ.chunkText(c.autos, STAGE1_CHARS), parciais = [];
-      for (let i = 0; i < blocos.length; i++) { setStep(1, "run", blocos.length > 1 ? `bloco ${i + 1} de ${blocos.length}` : "lendo"); parciais.push(...await etapa1Bloco(blocos[i], i + 1, blocos.length, signal, 0)); }
-      c.dossie = AJ.mergeDossies(parciais); c.resumo = AJ.resumoExecutivo(c.dossie); c.numero = c.dossie.numeroProcesso;
-      setStep(1, "done", `${c.dossie.pedidos.length} pedido(s)`);
-      etapa = 2; setStep(2, "run", "pensando…");
+      // ETAPA 1 — blocos em paralelo; os já lidos são reaproveitados.
+      const fila = c.lidos.map((x, i) => (x ? null : i)).filter((i) => i != null);
+      const falhas = [];
+      const trabalhador = async () => {
+        while (fila.length && !signal.aborted) {
+          const i = fila.shift(), t0 = Date.now();
+          PROG.blocos[i] = "run"; PROG.agora = `Lendo o bloco ${i + 1} de ${blocos.length}…`; renderProg();
+          try {
+            c.lidos[i] = await lerBloco(blocos[i], i + 1, blocos.length, signal, 0, ({ text }) => { PROG.agora = `Bloco ${i + 1}: recebendo a leitura do Claude (${text.length.toLocaleString("pt-BR")} caracteres)…`; });
+            PROG.blocos[i] = "done"; PROG.duracoes.push(Date.now() - t0);
+          } catch (e) {
+            PROG.blocos[i] = "fail";
+            if (e && e.code === "cancelled") throw e;
+            falhas.push({ i, e });
+            if (e && ["not_granted", "sampling_disabled", "session_expired", "capability_disabled"].includes(e.code)) throw e;
+          }
+          renderProg();
+        }
+      };
+      await Promise.all(Array.from({ length: Math.min(PARALELO, fila.length || 1) }, trabalhador));
+      if (signal.aborted) throw { code: "cancelled" };
+      if (falhas.length) {
+        const primeira = falhas[0].e;
+        throw { code: "blocos_pendentes", causa: primeira && primeira.code, message: `${falhas.length} bloco(s) não foram lidos (${falhas.map((f) => f.i + 1).join(", ")}): ${errMsg(primeira)} Clique em Gerar minuta de novo para continuar só com esses blocos.` };
+      }
+      c.dossie = AJ.mergeDossies(c.lidos.flat()); c.resumo = AJ.resumoExecutivo(c.dossie); c.numero = c.dossie.numeroProcesso;
+
+      // ETAPA 2 — redação, com o texto aparecendo enquanto é escrito.
+      PROG.etapa = 2; PROG.agora = `Dossiê pronto: ${c.dossie.pedidos.length} pedido(s), ${c.dossie.cronologia.length} evento(s). O Claude está pensando na minuta…`; renderProg();
       const sugerido = { despacho: "despacho", decisao_interlocutoria: "decisao", saneamento: "decisao", sentenca: "sentenca", embargos_declaracao: "embargos" };
       c.tipoAto = S.tipoAto !== "auto" ? S.tipoAto : (sugerido[c.dossie.atoSugerido] || "sentenca");
       const promptArea = S.prompts.find((x) => x.id === S.promptId) || null;
+      const montar = (d) => P.stage2({ dossie: d, paradigma: null, teses: [], precedentes: [], instrucao: $("#t-instrucao").value.trim(), tipoAto: c.tipoAto, promptArea });
+      let prompt = montar(c.dossie);
+      if (AJ.bytes(prompt) > MAX_BYTES - 5000) prompt = montar(compactar(c.dossie, MAX_BYTES - 5000 - (AJ.bytes(prompt) - AJ.bytes(JSON.stringify(c.dossie)))));
       painel("p-minuta"); S.minAba = "texto"; renderMinuta();
-      const r = await ask(P.stage2({ dossie: c.dossie, paradigma: null, teses: [], precedentes: [], instrucao: $("#t-instrucao").value.trim(), tipoAto: c.tipoAto, promptArea }),
-        { tier: "complex", signal, onText: ({ text }) => { setStep(2, "run", "redigindo"); clear($("#min-view"), h("div", { class: "folha claude-out" }, md(text))); } });
+      const r = await ask(prompt, { tier: "complex", signal, onText: ({ text }) => {
+        PROG.agora = `Redigindo: ${text.split(/\n\s*\n/).filter((x) => x.trim()).length} parágrafo(s) até agora…`;
+        clear($("#min-view"), h("div", { class: "folha claude-out" }, md(text)));
+      } });
       c.minuta = r.text.trim();
-      setStep(2, "done", r.truncated ? "resposta cortada pelo limite" : "");
-      etapa = 3; setStep(3, "done");
+      PROG.etapa = 3; PROG.agora = r.truncated ? "A resposta foi cortada pelo limite de tamanho: confira o final da minuta." : "Confira a aba Conferência antes de usar a minuta.";
+      c.lidos = null; // leitura concluída: libera a memória
       salvarHistorico(); render();
     } catch (e) {
-      setStep(etapa, "fail", e && e.code === "cancelled" ? "interrompido" : "falhou");
+      PROG.etapa = 4;
+      const lidos = (c.lidos || []).filter(Boolean).length;
+      PROG.agora = e && e.code === "cancelled" ? `Interrompido. ${lidos} bloco(s) já lidos ficam guardados: clique em Gerar minuta para continuar.` : `${lidos} bloco(s) lidos e guardados.`;
       if (!(e && e.code === "cancelled")) showErr($("#gerar-err"), e);
-      if (etapa === 2 && e && e.text) { c.minuta = e.text; render(); }
-    } finally { S.ctl = null; $("#b-parar").hidden = true; renderBotoes(); }
+      if (e && e.text && PROG.blocos.every((x) => x === "done")) { c.minuta = e.text; render(); }
+    } finally { clearInterval(PROG.timer); S.ctl = null; $("#b-parar").hidden = true; renderProg(); renderBotoes(); }
   }
   async function aprofundar() {
     const c = S.caso; S.ctl = new AbortController(); renderBotoes();
@@ -401,7 +483,8 @@
   }
 
   // ───────── Prompts ─────────
-  const AREAS = ["Juizado Especial Cível", "Cível", "Fazenda Pública", "Juizado da Fazenda Pública", "Família e Sucessões", "Previdenciário", "Criminal", "Execução Fiscal", "Outros"];
+  const AREAS = ["Juizado Especial Cível", "Cível", "Fazenda Pública", "Juizado da Fazenda Pública", "Família e Sucessões", "Previdenciário", "Criminal", "Infância e Juventude", "Execução Fiscal", "Outros"];
+  const CATEGORIA_ANTIGA = { civel: "Cível", fazenda: "Fazenda Pública", criminal: "Criminal", familia: "Família e Sucessões", infancia: "Infância e Juventude", outros: "Outros", todos: "Outros" };
   clear($("#pr-area"), AREAS.map((a) => h("option", { value: a, text: a })));
   let prEdit = null;
   $("#pr-q").addEventListener("input", renderPrompts);
@@ -447,7 +530,9 @@
     try {
       const j = JSON.parse(await f.text());
       // Aceita o formato desta página, o do sistema novo e o do sistema antigo (title/promptText).
-      const lista = (Array.isArray(j) ? j : j.prompts || []).map((x) => ({ titulo: x.titulo || x.title, area: x.area || x.category || "Outros", texto: x.texto || x.promptText || x.description })).filter((x) => typeof x.titulo === "string" && typeof x.texto === "string" && x.texto.trim());
+      const lista = (Array.isArray(j) ? j : j.prompts || []).filter((x) => x && !x.isDefault)
+        .map((x) => ({ titulo: x.titulo || x.title, area: x.area || CATEGORIA_ANTIGA[x.category] || "Outros", texto: x.texto || x.promptText || x.description }))
+        .filter((x) => typeof x.titulo === "string" && typeof x.texto === "string" && x.texto.trim());
       if (!lista.length) return toast("Nenhum prompt válido no arquivo.");
       let n = 0;
       for (const x of lista) { // só acrescenta: nunca sobrescreve os existentes
@@ -516,6 +601,8 @@
   function renderBotoes() {
     const c = S.caso, ok = !!S.cap.sample, ocupado = !!S.ctl;
     $("#b-gerar").disabled = !ok || !c.autos || ocupado;
+    const lidos = (c.lidos || []).filter(Boolean).length;
+    $("#b-gerar").textContent = lidos && !ocupado ? `Continuar (${lidos} de ${c.lidos.length} blocos lidos)` : "Gerar minuta";
     $("#b-enviar").disabled = !ok || !(c.minuta || c.autos) || ocupado;
   }
   function render() {
