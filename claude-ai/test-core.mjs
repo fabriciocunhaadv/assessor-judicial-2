@@ -20,4 +20,7 @@ const ch = AJ.chunkText(txt, 1500); t("chunk", ch.at(-1).endsWith("Parágrafo 39
 t("rank", AJ.rankPrecedentes("desconto indevido benefício previdenciário dano moral", [{ enunciado: "Desconto indevido em benefício previdenciário gera dano moral", palavrasChave: ["desconto indevido"] }]).length === 1);
 t("paragrafos", AJ.paragrafosDensos("x".repeat(300) + "\n\n## T\n\n" + "y".repeat(300)) === 2);
 t("secao", AJ.secao("## RELATÓRIO\na\n## FUNDAMENTAÇÃO\nb\n## DISPOSITIVO\nc", "FUNDAMENTA", "DISPOSITIVO").includes("b") && !AJ.secao("## RELATÓRIO\na\n## FUNDAMENTAÇÃO\nb\n## DISPOSITIVO\nc", "FUNDAMENTA", "DISPOSITIVO").includes("c"));
+const pz = AJ.calcularPrazo("2025-12-18", 15);
+t("prazo CPC com recesso", pz.vencimento === "2026-02-09");
+t("prazo corrido", AJ.calcularPrazo("2026-03-02", 5, [], false).vencimento === "2026-03-09");
 console.log(`${ok} ok, ${fail} falhas`);

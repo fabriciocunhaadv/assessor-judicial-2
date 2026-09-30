@@ -64,6 +64,8 @@ main.wrap { flex: 1; min-width: 0; max-width: none; margin: 0; padding: 20px 24p
 .page-h h2 { font: 600 18px/1.3 var(--f-ui); }
 .page-h p { margin: 2px 0 0; color: var(--muted); font-size: 13.5px; }
 @media (max-width: 860px) {
+  .ctx { width: 100%; order: 3; }
+  .ctx-m { display: none; }
   .shell { display: block; }
   .side { position: static; width: auto; padding: 6px 10px; border-right: 0; border-bottom: 1px solid var(--line); overflow-x: auto; }
   .side .grupo, nav.tabs .sep { display: none; }
@@ -95,7 +97,7 @@ main section[role="tabpanel"] { padding-top: 0; }
 .muted { color: var(--muted); } .small { font-size: 12.5px; }
 .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 
-label.f { display: grid; gap: 4px; font-size: 12.5px; color: var(--muted); }
+label.f, div.f { display: grid; gap: 4px; font-size: 12.5px; color: var(--muted); }
 input[type=text], input[type=number], select, textarea { width: 100%; background: var(--surface); border: 1px solid color-mix(in srgb, var(--muted) 45%, var(--line)); border-radius: 8px; padding: 8px 10px; color: var(--ink); }
 textarea { resize: vertical; line-height: 1.5; }
 .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; border-radius: 8px; padding: 8px 14px; border: 1px solid var(--btn); background: var(--btn); color: var(--btn-ink); font-weight: 500; cursor: pointer; }
@@ -123,6 +125,41 @@ textarea { resize: vertical; line-height: 1.5; }
 .err { padding: 10px 12px; border-radius: 6px; background: var(--bad-soft); color: var(--bad); font-size: 13px; }
 .info { padding: 10px 12px; border-radius: 6px; background: var(--accent-soft); color: var(--ink); font-size: 13px; }
 .warnbox { padding: 10px 12px; border-radius: 6px; background: var(--warn-soft); color: var(--ink); font-size: 13px; }
+
+/* Contexto no topo (unidade e prompt ativos) */
+.ctx { display: flex; flex-wrap: wrap; gap: 8px; }
+.ctx-i { display: inline-flex; align-items: center; gap: 6px; max-width: 22rem; background: #1C1917; color: var(--top-ink); border: 1px solid var(--top-line); border-radius: 8px; padding: 5px 10px; font-size: 12px; cursor: pointer; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.ctx-i select { background: transparent; border: 0; padding: 0; color: var(--top-ink); font-size: 12px; font-weight: 500; width: auto; max-width: 18rem; }
+.ctx-i select option { color: #1C1917; }
+.ctx-m { color: var(--top-muted); }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+.aviso { margin-bottom: 16px; padding: 10px 14px; border-radius: 10px; border: 1px solid #BAE6FD; background: #F0F9FF; color: #0C4A6E; font-size: 13.5px; }
+.aviso.alerta { border-color: #FDE68A; background: #FFFBEB; color: #78350F; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .aviso { background: #082F49; border-color: #0C4A6E; color: #E0F2FE; } :root:not([data-theme="light"]) .aviso.alerta { background: #451A03; border-color: #78350F; color: #FEF3C7; } }
+.seg { display: flex; flex-wrap: wrap; gap: 4px; background: var(--sunk); border-radius: 8px; padding: 4px; }
+.seg button { flex: 1; border: 0; background: none; border-radius: 6px; padding: 6px 10px; font-size: 12.5px; font-weight: 500; color: var(--muted); cursor: pointer; white-space: nowrap; }
+.seg button[aria-checked="true"] { background: var(--surface); color: var(--accent); box-shadow: 0 1px 2px rgb(0 0 0 / .08); }
+.g-side-r { grid-template-columns: minmax(0, 1fr) minmax(0, 400px); }
+@media (max-width: 1100px) { .g-side-r { grid-template-columns: minmax(0, 1fr); } }
+/* Agenda */
+.cal { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+.cal .dow { font-size: 11px; font-weight: 600; text-transform: uppercase; color: var(--muted); text-align: center; padding: 4px 0; }
+.cal button { min-height: 64px; display: flex; flex-direction: column; align-items: flex-start; gap: 3px; padding: 6px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); cursor: pointer; text-align: left; min-width: 0; overflow: hidden; }
+.cal button:hover { border-color: var(--accent); }
+.cal button[aria-pressed="true"] { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.cal button.hoje .n { background: var(--btn); color: #fff; border-radius: 999px; padding: 0 6px; }
+.cal .n { font-size: 12px; font-weight: 600; }
+.cal .ev { font-size: 11px; line-height: 1.3; width: 100%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: var(--muted); }
+.dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 4px; flex: none; }
+.d-prazo { background: #E11D48; } .d-audiencia { background: #7C3AED; } .d-diligencia { background: #0284C7; } .d-outro { background: #A8A29E; }
+.item.feito p, .item.feito strong { text-decoration: line-through; color: var(--muted); }
+/* Guia e manual */
+.guia h3 { font-size: 14px; margin: 16px 0 6px; } .guia h3:first-child { margin-top: 0; }
+.guia p { margin: 0 0 8px; font-size: 13.5px; white-space: pre-wrap; }
+details.reg { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; }
+details.reg summary { cursor: pointer; font-weight: 600; font-size: 13.5px; }
+details.reg ul { margin: 6px 0; padding-left: 18px; font-size: 13px; display: grid; gap: 3px; }
+details.reg p { margin: 6px 0; font-size: 13px; }
 
 /* Folha da minuta */
 .folha { font: 16px/1.72 var(--f-doc); color: var(--ink); max-width: 72ch; margin: 0 auto; overflow-wrap: anywhere; }
@@ -168,6 +205,7 @@ table { border-collapse: collapse; width: 100%; font-size: 13px; font-variant-nu
 th, td { padding: 6px 8px; border-bottom: 1px solid var(--line); text-align: right; white-space: nowrap; }
 th:first-child, td:first-child { text-align: left; }
 .num { font-variant-numeric: tabular-nums; }
+#equipe .tbl th, #equipe .tbl td { white-space: normal; text-align: left; vertical-align: top; }
 .chip-inj { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 6px; background: var(--ref-soft); color: var(--ref); font-size: 12.5px; }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
 </style>
@@ -177,6 +215,10 @@ th:first-child, td:first-child { text-align: left; }
     <div class="brand">
       <div class="logo"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m14 13-7.5 7.5a2.12 2.12 0 0 1-3-3L11 10"/><path d="m16 16 6-6M8 8l6-6M9 7l8 8M21 11l-8-8"/></svg></div>
       <div><h1>Assessor Judicial <span class="chip-claude">com Claude</span></h1><small>Gabinete · minutas, conferência e audiência</small></div>
+    </div>
+    <div class="ctx">
+      <label class="ctx-i" id="ctx-unidade" hidden><span class="sr">Unidade judiciária ativa</span><select id="s-unidade"></select></label>
+      <button class="ctx-i" type="button" id="b-prompt-ativo" title="Prompt ativo">✦ <span class="ctx-m">Prompt ativo:</span> <strong id="prompt-ativo">Padrão do sistema</strong></button>
     </div>
     <div class="status" id="status">
       <span class="pill" id="st-claude">Claude: conectando…</span>
@@ -195,14 +237,23 @@ th:first-child, td:first-child { text-align: left; }
       <button role="tab" id="t-audiencia" aria-controls="audiencia" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m14 13-7.5 7.5a2.12 2.12 0 0 1-3-3L11 10"/><path d="m16 16 6-6M8 8l6-6M9 7l8 8M21 11l-8-8"/></svg>Mesa de Audiência</button>
       <button role="tab" id="t-chat" aria-controls="chat" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>Chat &amp; Refino</button>
       <button role="tab" id="t-historico" aria-controls="historico" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5M12 7v5l4 2"/></svg>Histórico</button>
+      <button role="tab" id="t-agenda" aria-controls="agenda" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>Agenda</button>
       <div class="sep" aria-hidden="true"></div>
       <div class="grupo" aria-hidden="true">Repositório jurídico</div>
       <button role="tab" id="t-gabinete" aria-controls="gabinete" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1ZM2 16l3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="M7 21h10M12 3v18M3 7h2c2 0 5-1 7-2 2 1 5 2 7 2h2"/></svg>Teses &amp; Modelos</button>
       <button role="tab" id="t-precedentes" aria-controls="precedentes" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2zM22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>Súmulas &amp; Precedentes</button>
+      <button role="tab" id="t-prompts" aria-controls="prompts" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"/></svg>Prompts por Área</button>
+      <button role="tab" id="t-legislacao" aria-controls="legislacao" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M8 6h8M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01M16 18h.01M8 10h8"/></svg>Legislação &amp; Juros</button>
+      <button role="tab" id="t-projudi" aria-controls="projudi" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 12h6M9 16h6"/></svg>Guia do PROJUDI</button>
+      <div class="sep" aria-hidden="true"></div>
+      <div class="grupo" aria-hidden="true">Gabinete</div>
+      <button role="tab" id="t-equipe" aria-controls="equipe" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>Equipe &amp; Lotações</button>
+      <button role="tab" id="t-ajuda" aria-controls="ajuda" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3M12 17h.01"/></svg>Manual de uso</button>
     </nav>
   </aside>
 
 <main class="wrap">
+  <div class="aviso" id="aviso" role="status" hidden><strong>Aviso do gabinete:</strong> <span id="aviso-t"></span></div>
   <!-- ESTEIRA -->
   <section role="tabpanel" id="esteira" aria-labelledby="t-esteira">
     <div class="page-h"><h2>Nova análise</h2><p>Autos em PDF → Etapa 1 (Assessor Fático) → Etapa 2 (Juiz Revisor) → conferência automática.</p></div>
@@ -219,6 +270,14 @@ th:first-child, td:first-child { text-align: left; }
           <div id="leitura-err"></div>
         </div></div>
         <div class="panel"><header><h2>2 · Parâmetros do gabinete</h2></header><div class="body">
+          <label class="f" for="s-prompt">Prompt da área
+            <select id="s-prompt"><option value="">Padrão do sistema (sem instruções de área)</option></select>
+          </label>
+          <div class="f"><span>Tipo de minuta a redigir</span>
+            <div class="seg" id="seg-ato" role="radiogroup" aria-label="Tipo de minuta">
+              <button type="button" role="radio" data-v="auto" aria-checked="true">Auto-detectar</button><button type="button" role="radio" data-v="sentenca" aria-checked="false">Sentença</button><button type="button" role="radio" data-v="decisao" aria-checked="false">Decisão</button><button type="button" role="radio" data-v="despacho" aria-checked="false">Despacho</button><button type="button" role="radio" data-v="embargos" aria-checked="false">Embargos</button>
+            </div>
+          </div>
           <label class="f" for="s-paradigma">Minuta Paradigma (espelho estrutural)
             <select id="s-paradigma"><option value="">Sem paradigma</option></select>
           </label>
@@ -251,11 +310,16 @@ th:first-child, td:first-child { text-align: left; }
       <div class="panel"><header><h2>1 · Autos</h2><div class="row"><button class="btn quiet sm" id="pg-prev" type="button" aria-label="Página anterior">‹</button><span class="small num" id="pg-info">—</span><button class="btn quiet sm" id="pg-next" type="button" aria-label="Próxima página">›</button></div></header>
         <div class="body"><input type="text" id="busca" placeholder="Buscar nos autos (mín. 3 letras)"><div class="hits" id="hits"></div><div class="pdfbox" id="pdfbox"><span class="muted small">Carregue os autos na Esteira de Minutas.</span></div></div></div>
       <div class="panel"><header><h2>2 · Minuta do assessor</h2><button class="btn sm" id="b-auditar" type="button" disabled>Auditar</button></header>
-        <div class="body"><textarea id="editor" class="editor" placeholder="Cole aqui a minuta a conferir, ou gere uma na Esteira."></textarea><div id="lupa-err"></div></div></div>
+        <div class="body"><textarea id="editor" class="editor" placeholder="Cole aqui a minuta a conferir, ou gere uma na Esteira."></textarea>
+          <div class="grid g-2"><label class="f" for="lupa-assessor">Assessor(a) responsável<input type="text" id="lupa-assessor" maxlength="120" placeholder="Nome"></label>
+          <label class="f" for="lupa-prompt">Diretriz do gabinete<select id="lupa-prompt"><option value="">Nenhuma</option></select></label></div>
+          <label class="f" for="lupa-ponto">Ponto de atenção do(a) juiz(a) (opcional)<textarea id="lupa-ponto" rows="2" maxlength="5000" placeholder="Ex.: conferir se a tutela de urgência foi apreciada."></textarea></label>
+          <div id="lupa-err"></div></div></div>
       <div class="panel"><header><h2>3 · Diagnóstico</h2><span id="nota"></span></header><div class="body scroll" id="diag">
         <div class="placeholder"><p>A Matriz de Conformidade confere adstrição aos pedidos (extra, ultra e citra petita), dados sem lastro nos autos, precedentes vinculantes e consectários da Lei nº 14.905/2024.</p><p>Depois da auditoria, gere a minuta gabarito com as correções.</p></div>
       </div></div>
     </div>
+    <div class="panel" style="margin-top:16px"><header><h2>Processos auditados</h2><span class="muted small">Compartilhado com o gabinete.</span></header><div class="body"><div class="tbl" id="aud-list"></div></div></div>
   </section>
 
   <!-- AUDIÊNCIA -->
@@ -300,7 +364,7 @@ th:first-child, td:first-child { text-align: left; }
 
   <!-- GABINETE -->
   <section role="tabpanel" id="gabinete" aria-labelledby="t-gabinete" hidden>
-    <div class="page-h"><h2>Teses &amp; Modelos</h2><p>Minutas Paradigma, Caderno de Teses, consectários da Lei nº 14.905/2024 e permissões.</p></div>
+    <div class="page-h"><h2>Teses &amp; Modelos</h2><p>Minutas Paradigma (espelho estrutural do juiz), Caderno de Teses em texto corrido e teses avulsas.</p></div>
     <div class="grid g-2">
       <div class="panel"><header><h2>Minutas Paradigma</h2></header><div class="body">
         <div class="items" id="par-list"></div>
@@ -312,7 +376,12 @@ th:first-child, td:first-child { text-align: left; }
         </form>
         <p class="muted small" id="par-ro" hidden>Só Juiz(a) Titular e Editores alteram paradigmas.</p>
       </div></div>
-      <div class="panel"><header><h2>Caderno de Teses</h2></header><div class="body">
+      <div class="panel"><header><h2>Caderno de Teses (texto corrido)</h2><span class="muted small" id="cad-info"></span></header><div class="body">
+        <p class="muted small">Entendimentos do juízo em texto livre. Entra em todas as minutas e auditorias quando “Aplicar o Caderno de Teses” estiver marcado.</p>
+        <textarea id="cad-texto" rows="10" placeholder="Ex.: Em descontos indevidos de benefício previdenciário, o juízo reconhece dano moral in re ipsa…"></textarea>
+        <div class="row"><button class="btn" id="b-cad" type="button">Salvar caderno</button></div>
+      </div></div>
+      <div class="panel"><header><h2>Teses avulsas</h2></header><div class="body">
         <div class="items" id="tes-list"></div>
         <form id="tes-form" class="stack" hidden>
           <label class="f" for="tes-titulo">Título<input type="text" id="tes-titulo" required></label>
@@ -321,7 +390,77 @@ th:first-child, td:first-child { text-align: left; }
         </form>
         <p class="muted small" id="tes-ro" hidden>Só Juiz(a) Titular e Editores alteram o Caderno de Teses.</p>
       </div></div>
-      <div class="panel"><header><h2>Consectários — Lei nº 14.905/2024</h2></header><div class="body">
+    </div>
+  </section>
+
+  <!-- HISTÓRICO -->
+  <section role="tabpanel" id="historico" aria-labelledby="t-historico" hidden>
+    <div class="page-h"><h2>Histórico</h2><p>Suas minutas geradas nesta página, visíveis só para você.</p></div>
+    <div class="panel"><header><h2>Minhas minutas</h2><span class="muted small">Visíveis só para você.</span></header><div class="body"><div class="items" id="hist-list"></div></div></div>
+  </section>
+
+  <!-- AGENDA -->
+  <section role="tabpanel" id="agenda" aria-labelledby="t-agenda" hidden>
+    <div class="page-h"><h2>Agenda do gabinete</h2><p>Prazos, audiências e diligências, com a calculadora de prazos em dias úteis do CPC.</p></div>
+    <div class="grid g-side-r">
+      <div class="panel"><header><h2 id="ag-mes">Mês</h2><div class="row"><button class="btn quiet sm" id="ag-prev" type="button" aria-label="Mês anterior">‹</button><button class="btn quiet sm" id="ag-hoje" type="button">Hoje</button><button class="btn quiet sm" id="ag-next" type="button" aria-label="Próximo mês">›</button></div></header>
+        <div class="body"><div class="cal" id="ag-grid"></div><div class="row small muted"><span class="dot d-prazo"></span>Prazo <span class="dot d-audiencia"></span>Audiência <span class="dot d-diligencia"></span>Diligência <span class="dot d-outro"></span>Outro</div></div></div>
+      <div class="stack">
+        <div class="panel"><header><h2 id="ag-dia-h">Dia</h2><button class="btn sm" id="ag-novo" type="button">Novo compromisso</button></header><div class="body"><div class="items" id="ag-dia"></div>
+          <form id="ag-form" class="stack" hidden>
+            <label class="f" for="ag-titulo">Título<input type="text" id="ag-titulo" required maxlength="200"></label>
+            <div class="grid g-2"><label class="f" for="ag-tipo">Tipo<select id="ag-tipo"><option value="prazo">Prazo</option><option value="audiencia">Audiência</option><option value="diligencia">Diligência</option><option value="outro">Outro</option></select></label>
+            <label class="f" for="ag-data">Data<input type="text" id="ag-data" placeholder="AAAA-MM-DD" required></label>
+            <label class="f" for="ag-hora">Hora<input type="text" id="ag-hora" placeholder="HH:MM"></label>
+            <label class="f" for="ag-proc">Processo<input type="text" id="ag-proc"></label></div>
+            <label class="f" for="ag-resp">Responsável<input type="text" id="ag-resp"></label>
+            <label class="f" for="ag-obs">Observação<textarea id="ag-obs" rows="2"></textarea></label>
+            <div class="row"><button class="btn" type="submit">Salvar</button><button class="btn quiet" type="button" id="ag-cancelar">Cancelar</button></div>
+          </form></div></div>
+        <div class="panel"><header><h2>Calculadora de prazos (CPC)</h2></header><div class="body">
+          <div class="grid g-2"><label class="f" for="pz-int">Intimação / publicação<input type="text" id="pz-int" placeholder="AAAA-MM-DD"></label>
+          <label class="f" for="pz-dias">Prazo (dias)<input type="number" id="pz-dias" min="1" max="3650" value="15"></label></div>
+          <label class="row small" for="pz-uteis"><input type="checkbox" id="pz-uteis" checked> Contar em dias úteis (art. 219 do CPC)</label>
+          <label class="f" for="pz-extras">Datas sem expediente no tribunal (uma por linha, AAAA-MM-DD)<textarea id="pz-extras" rows="2" style="font-family:var(--f-mono)"></textarea></label>
+          <div class="row"><button class="btn quiet" id="pz-calc" type="button">Calcular</button></div>
+          <div id="pz-out"></div>
+        </div></div>
+        <div class="panel"><header><h2>Google Agenda</h2></header><div class="body">
+          <p class="muted small">O claude.ai não permite exibir o Google Agenda dentro da página. Guarde aqui o link da agenda do gabinete para abri-la em outra aba.</p>
+          <div class="row" id="gcal-open"></div>
+          <form id="gcal-form" class="row" hidden><input type="text" id="gcal-url" placeholder="https://calendar.google.com/…" style="flex:1;min-width:0"><button class="btn quiet sm" type="submit">Salvar link</button></form>
+        </div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- PROMPTS -->
+  <section role="tabpanel" id="prompts" aria-labelledby="t-prompts" hidden>
+    <div class="page-h"><h2>Prompts por Área</h2><p>Instruções do gabinete para cada matéria. O prompt escolhido na Nova Análise entra na redação da minuta.</p></div>
+    <div class="grid g-side-r">
+      <div class="panel"><header><h2 id="pr-h">Prompts do gabinete</h2><div class="row"><button class="btn quiet sm" id="pr-exp" type="button">Exportar JSON</button><label class="btn quiet sm" id="pr-imp-l" for="pr-imp">Importar JSON<input type="file" id="pr-imp" accept="application/json,.json" hidden></label></div></header>
+        <div class="body"><div class="items" id="pr-list"></div></div></div>
+      <div class="panel"><header><h2 id="pr-form-h">Novo prompt</h2></header><div class="body">
+        <form id="pr-form" class="stack">
+          <label class="f" for="pr-titulo">Título<input type="text" id="pr-titulo" required maxlength="160" placeholder="JEC — consumidor bancário"></label>
+          <label class="f" for="pr-area">Área<select id="pr-area"></select></label>
+          <label class="f" for="pr-texto">Instruções<textarea id="pr-texto" rows="10" required placeholder="1. Aplique os Enunciados do FONAJE pertinentes…"></textarea></label>
+          <label class="row small" for="pr-ativo"><input type="checkbox" id="pr-ativo" checked> Ativo</label>
+          <div class="row"><button class="btn" type="submit">Salvar prompt</button><button class="btn quiet" type="button" id="pr-limpar">Limpar</button></div>
+        </form>
+        <p class="muted small" id="pr-ro" hidden>Só Juiz(a) Titular e Editores alteram os prompts.</p>
+      </div></div>
+    </div>
+  </section>
+
+  <!-- LEGISLACAO -->
+  <section role="tabpanel" id="legislacao" aria-labelledby="t-legislacao" hidden>
+    <div class="page-h"><h2>Legislação &amp; Juros</h2><p>Regimes de correção monetária e juros por microssistema, com a calculadora da Lei nº 14.905/2024.</p></div>
+    <div class="grid g-side-r">
+      <div class="panel"><header><h2>Catálogo de regimes</h2></header><div class="body"><input type="text" id="reg-q" placeholder="Filtrar (ex.: Fazenda, consumidor, trabalhista)"><div class="items" id="reg-list"></div>
+        <p class="muted small">Conteúdo de referência. Confira sempre a legislação e a jurisprudência vigentes.</p></div></div>
+      <div class="stack">
+        <div class="panel"><header><h2>Consectários — Lei nº 14.905/2024</h2></header><div class="body">
         <p class="muted small">Correção pelo IPCA e juros pela taxa legal (Selic − IPCA, nunca negativa). Informe os índices mensais oficiais; nada é estimado.</p>
         <div class="grid g-2">
           <label class="f" for="cx-p">Principal (R$)<input type="number" id="cx-p" step="0.01" value="10000"></label>
@@ -335,8 +474,44 @@ th:first-child, td:first-child { text-align: left; }
         <button class="btn quiet" id="b-calc" type="button">Calcular</button>
         <div id="cx-out"></div>
       </div></div>
-      <div class="panel"><header><h2>Quem pode o quê</h2></header><div class="body small">
-        <p>O acesso segue o compartilhamento desta página no claude.ai:</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- PROJUDI -->
+  <section role="tabpanel" id="projudi" aria-labelledby="t-projudi" hidden>
+    <div class="page-h"><h2>Guia do PROJUDI</h2><p>Rotinas do gabinete no PROJUDI, com busca.</p></div>
+    <div class="grid g-side-r">
+      <div class="panel"><header><h2>Guia</h2><input type="text" id="pj-q" placeholder="Buscar rotina (mín. 2 letras)" style="max-width:280px"></header><div class="body"><div id="pj-view" class="guia"></div></div></div>
+      <div class="panel" id="pj-edit" hidden><header><h2>Editar guia</h2></header><div class="body">
+        <p class="muted small">Use “# Título” para cada rotina e texto corrido abaixo. A busca procura nos títulos e no texto.</p>
+        <textarea id="pj-texto" rows="18" style="font-family:var(--f-mono);font-size:13px"></textarea>
+        <div class="row"><button class="btn" id="pj-salvar" type="button">Salvar guia</button></div>
+      </div></div>
+    </div>
+  </section>
+
+  <!-- EQUIPE -->
+  <section role="tabpanel" id="equipe" aria-labelledby="t-equipe" hidden>
+    <div class="page-h"><h2>Equipe &amp; Lotações</h2><p>Unidades judiciárias do gabinete, aviso para a equipe e quem pode o quê.</p></div>
+    <div class="grid g-2">
+      <div class="panel"><header><h2>Unidades judiciárias (lotações)</h2></header><div class="body">
+        <div class="items" id="un-list"></div>
+        <form id="un-form" class="stack" hidden>
+          <div class="grid g-2"><label class="f" for="un-nome">Unidade<input type="text" id="un-nome" required placeholder="Juizado Especial Cível"></label>
+          <label class="f" for="un-comarca">Comarca<input type="text" id="un-comarca" required></label></div>
+          <label class="f" for="un-comp">Competência<input type="text" id="un-comp" placeholder="Cível, JEC, Fazenda Pública…"></label>
+          <button class="btn" type="submit">Adicionar unidade</button>
+        </form>
+      </div></div>
+      <div class="panel"><header><h2>Aviso à equipe</h2></header><div class="body">
+        <p class="muted small">Aparece no topo da página para todos do gabinete.</p>
+        <textarea id="av-texto" rows="3" maxlength="600" placeholder="Ex.: Mutirão de sentenças do JEC nesta semana."></textarea>
+        <div class="row"><button class="btn" id="av-pub" type="button">Publicar aviso</button><button class="btn quiet" id="av-ret" type="button">Retirar aviso</button></div>
+        <p class="muted small" id="av-ro" hidden>Só Juiz(a) Titular e Editores publicam avisos.</p>
+      </div></div>
+      <div class="panel"><header><h2>Membros e permissões</h2></header><div class="body small">
+        <p>A equipe é quem tem acesso a esta página: convide cada membro pelo botão <strong>Compartilhar</strong> do claude.ai e escolha o nível.</p>
         <div class="tbl"><table>
           <thead><tr><th>Papel no gabinete</th><th>Nível no compartilhamento</th><th>Pode</th></tr></thead>
           <tbody>
@@ -350,10 +525,13 @@ th:first-child, td:first-child { text-align: left; }
     </div>
   </section>
 
-  <!-- HISTÓRICO -->
-  <section role="tabpanel" id="historico" aria-labelledby="t-historico" hidden>
-    <div class="page-h"><h2>Histórico</h2><p>Suas minutas geradas nesta página, visíveis só para você.</p></div>
-    <div class="panel"><header><h2>Minhas minutas</h2><span class="muted small">Visíveis só para você.</span></header><div class="body"><div class="items" id="hist-list"></div></div></div>
+  <!-- AJUDA -->
+  <section role="tabpanel" id="ajuda" aria-labelledby="t-ajuda" hidden>
+    <div class="page-h"><h2>Manual de uso</h2><p>Como usar cada módulo e o que mudou em cada versão.</p></div>
+    <div class="grid g-2">
+      <div class="panel"><header><h2>Módulos</h2></header><div class="body"><div class="items" id="man-mod"></div></div></div>
+      <div class="panel"><header><h2>Novidades</h2></header><div class="body"><div class="items" id="man-log"></div></div></div>
+    </div>
   </section>
 </main>
 </div>
@@ -361,5 +539,6 @@ th:first-child, td:first-child { text-align: left; }
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js"></script>
 <script src="core.js"></script>
+<script src="regimes.js"></script>
 <script src="prompts.js"></script>
 <script src="app.js"></script>

@@ -37,7 +37,15 @@ Responda SOMENTE com um objeto JSON neste formato:
 ${bloco}
 </autos>`;
 
-  const stage2 = ({ dossie, paradigma, teses, precedentes, instrucao }) => {
+  /** Estrutura por tipo de ato (mesmo texto de shared/gabinete.ts). A fundamentação longa só é exigida em sentença. */
+  const REGRA_POR_ATO = {
+    sentenca: "SENTENÇA completa: relatório, fundamentação nos 7 blocos (mínimo de 14 parágrafos densos) e dispositivo que resolve cada pedido.",
+    decisao: "DECISÃO INTERLOCUTÓRIA (ex.: tutela de urgência, saneamento do art. 357 do CPC): relatório breve, fundamentação objetiva nos blocos pertinentes (omita os que não se aplicam) e dispositivo com as providências.",
+    despacho: "DESPACHO de mero expediente: sem relatório extenso e sem fundamentação em blocos; dispositivo com as determinações numeradas e prazos.",
+    embargos: "DECISÃO EM EMBARGOS DE DECLARAÇÃO: relatório dos vícios apontados (omissão, contradição, obscuridade, erro material — art. 1.022 do CPC), enfrentamento de cada vício e dispositivo (conhecer e acolher/rejeitar).",
+  };
+
+  const stage2 = ({ dossie, paradigma, teses, precedentes, instrucao, tipoAto = "sentenca", promptArea = null, unidade = null, caderno = "" }) => {
     let s = `${REGRAS}
 
 PAPEL: JUIZ REVISOR / REDATOR MAGISTRAL (ETAPA 2 DE 2). Redija a minuta final completa a partir EXCLUSIVAMENTE do dossiê fático abaixo. Não acrescente fatos que não estejam nele.
@@ -55,12 +63,27 @@ Narrativa cronológica com a localização (Mov./Arq./Pág.) de cada ato.
 ### 7. Consectários e ônus da sucumbência
 ## DISPOSITIVO
 
+TIPO DE ATO A REDIGIR: ${REGRA_POR_ATO[tipoAto] || REGRA_POR_ATO.sentenca}
+Em despacho, decisão e embargos, adapte a estrutura acima ao ato (omita os blocos que não se aplicam).
+
 REGRAS DE REDAÇÃO
 - No bloco 6 e no DISPOSITIVO, marque cada pedido pelo id entre colchetes na primeira menção, ex.: "[P2]". Todos os pedidos do dossiê devem ser julgados, um a um, por litisconsorte.
 - Dispositivo: liquide os consectários conforme a Lei nº 14.905/2024 — correção monetária pelo IPCA (art. 389, parágrafo único, do CC) e juros de mora pela taxa legal (Selic deduzido o IPCA, art. 406, §§ 1º e 3º, do CC), com termos iniciais (Súmulas 43, 54 e 362 do STJ, quando cabíveis). Em Juizado Especial, observe os arts. 54 e 55 da Lei nº 9.099/95.
-- Proibida minuta telegráfica: a FUNDAMENTAÇÃO deve ter no mínimo 14 parágrafos densos (em regra 14 a 20 ou mais), proporcionais à complexidade.
-- Use **negrito** apenas em títulos internos e no resultado de cada pedido.
+${tipoAto === "sentenca" ? "- Proibida minuta telegráfica: a FUNDAMENTAÇÃO deve ter no mínimo 14 parágrafos densos (em regra 14 a 20 ou mais), proporcionais à complexidade.\n" : ""}- Use **negrito** apenas em títulos internos e no resultado de cada pedido.
 - Responda somente com a minuta, sem comentários antes ou depois.`;
+    if (unidade) s += `
+
+UNIDADE JUDICIÁRIA: ${unidade.nome} — Comarca de ${unidade.comarca}${unidade.competencia ? ` (${unidade.competencia})` : ""}. Use-a no cabeçalho e observe o rito dessa competência.`;
+    if (promptArea) s += `
+
+DIRETRIZES DO GABINETE PARA A ÁREA "${promptArea.area}" (${promptArea.titulo}) — aplique-as, respeitadas as regras inegociáveis:
+${promptArea.texto}`;
+    if (caderno && caderno.trim()) s += `
+
+CADERNO DE TESES DO GABINETE (texto corrido; entendimento do juízo — aplique quando o caso se enquadrar):
+<caderno>
+${caderno.trim().slice(0, 30000)}
+</caderno>`;
     if (paradigma) s += `
 
 MINUTA PARADIGMA DO MAGISTRADO — ESPELHO ESTRUTURAL
@@ -70,7 +93,7 @@ ${paradigma.texto.slice(0, 40000)}
 </paradigma>`;
     if (teses.length) s += `
 
-CADERNO DE TESES DO GABINETE (entendimento do juízo — aplique quando o caso se enquadrar e cite expressamente):
+TESES DO GABINETE (entendimento do juízo — aplique quando o caso se enquadrar e cite expressamente):
 ${teses.map((t, i) => `T${i + 1}. ${t.titulo}: ${t.texto}`).join("\n")}`;
     if (precedentes.length) s += `
 
@@ -99,7 +122,7 @@ ${resumo}
 ${minuta}
 </minuta>`;
 
-  const auditoria = (minuta, autos, alertas) => `${REGRAS}
+  const auditoria = (minuta, autos, alertas, extras = {}) => `${REGRAS}
 
 PAPEL: AUDITOR DE CONFORMIDADE — LUPA DO MAGISTRADO. Audite a minuta do assessor ANTES da assinatura, confrontando-a com os autos.
 
@@ -108,7 +131,7 @@ Verifique: (1) adstrição — pedidos julgados além (ultra), fora (extra) ou n
 Responda SOMENTE com JSON:
 {"nota":0,"citraPetita":[""],"ultraPetita":[""],"extraPetita":[""],"alucinacoes":[{"trecho":"","motivo":"","fonteCorreta":null}],"precedentes":[{"precedente":"","situacao":"respeitado|violado|nao_citado_aplicavel"}],"consectarios":"","recomendacoes":[""]}
 
-ALERTAS DO VERIFICADOR AUTOMÁTICO (dados da minuta não encontrados literalmente nos autos):
+${extras.diretriz ? `DIRETRIZ DO GABINETE (${extras.diretriz.titulo}) — considere-a no diagnóstico:\n${extras.diretriz.texto}\n\n` : ""}${extras.caderno ? `CADERNO DE TESES DO GABINETE:\n<caderno>\n${extras.caderno.slice(0, 20000)}\n</caderno>\n\n` : ""}${extras.pontoAtencao ? `PONTO DE ATENÇÃO INDICADO PELO(A) JUIZ(A) — examine-o expressamente:\n${extras.pontoAtencao}\n\n` : ""}ALERTAS DO VERIFICADOR AUTOMÁTICO (dados da minuta não encontrados literalmente nos autos):
 ${alertas || "nenhum"}
 
 <minuta_assessor>
@@ -179,5 +202,5 @@ Responda SOMENTE com JSON:
 ${trecho}
 </trecho>`;
 
-  root.PROMPTS = { stage1, stage2, aprofundar, auditoria, gabarito, audiencia, termo, chatRegras, precedentes };
+  root.PROMPTS = { REGRA_POR_ATO, stage1, stage2, aprofundar, auditoria, gabarito, audiencia, termo, chatRegras, precedentes };
 })(window);
