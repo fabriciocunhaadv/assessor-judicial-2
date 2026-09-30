@@ -89,6 +89,20 @@
     const loc = L(S.caso.locais).find((l) => l.mov === String(mov) && l.arq === String(arq) && l.pag === String(pag));
     return loc ? loc.pdf : null;
   }
+  // Minutas antigas (antes da mudança) ainda trazem "[P4]" e "⟦Pág. N⟧": mostra o pedido pelo conteúdo e a folha.
+  function nomePedido(id) {
+    const p = S.caso.dossie && L(S.caso.dossie.pedidos).find((x) => x.id === id);
+    if (!p) return null;
+    const d = String(p.descricao || "").replace(/\s+/g, " ").trim();
+    return `“${d.length > 70 ? d.slice(0, 67) + "…" : d}”`;
+  }
+  function textoLegado(t) {
+    return String(t)
+      .replace(/\[(P\d+)\]/g, (m, id) => nomePedido(id) || m)
+      .replace(/⟦Pág\. (\d+)⟧/g, "fl. $1")
+      .replace(/⟦Mov\. (\d+) · Arq\. (\d+) · Pág\. (\d+)[^⟧]*⟧/g, "Mov. $1, Arq. $2, Pág. $3")
+      .replace(/⟦PDF (\d+)⟧/g, "fl. $1");
+  }
   const REF = /(⟦[^⟧]*⟧|\bMov(?:\.|imentação)\s?\d+\s*[,;–-]?\s*Arq(?:\.|uivo)\s?\d+\s*[,;–-]?\s*Pág(?:\.|ina)?s?\s?\d+(?:\s?[-–]\s?\d+)?|\bfls?\.\s?\d+(?: dos autos digitais)?|\b(?:Mov|Arq|Pág|Evento)\.?\s?\d+(?:[.-]\d+)?|\[P\d+\])/g;
   function irParaPagina(n) { S.pagina = n; painel("p-autos"); renderPagina(); }
   function inlineRefs(text) {
@@ -96,7 +110,7 @@
     for (const part of text.split(REF)) {
       if (!part) continue;
       REF.lastIndex = 0;
-      if (/^\[P\d+\]$/.test(part)) continue; // códigos internos de pedido não aparecem
+      if (/^\[P\d+\]$/.test(part)) out.push(h("span", { class: "pid", text: part })); // código antigo sem pedido correspondente
       else if (/^⟦/.test(part)) continue; // marcador interno de página
       else if (REF.test(part)) {
         REF.lastIndex = 0;
@@ -118,7 +132,7 @@
   }
   function md(text) {
     const frag = document.createDocumentFragment();
-    for (const block of String(text || "").split(/\n\s*\n/)) {
+    for (const block of textoLegado(text || "").split(/\n\s*\n/)) {
       const t = block.trim(); if (!t) continue;
       const lines = t.split("\n"), hm = /^(#{1,3})\s+(.*)$/.exec(lines[0]);
       if (hm) { frag.append(h("h" + hm[1].length, null, inline(hm[2]))); if (lines.length > 1) frag.append(md(lines.slice(1).join("\n"))); continue; }
@@ -367,7 +381,7 @@
   function limparMinuta(texto) {
     let apreciados = null;
     const t = String(texto).replace(/\n*=+\s*PEDIDOS APRECIADOS\s*:?\s*([^=\n]*)=*\s*$/i, (_, ids) => { apreciados = (ids.match(/P\d+/gi) || []).map((x) => x.toUpperCase()); return ""; });
-    return { texto: t.replace(/\s?\[P\d+\]/g, "").trim(), apreciados };
+    return { texto: t.replace(/\[(P\d+)\]/g, (m, id) => nomePedido(id) || m).trim(), apreciados };
   }
   function aplicarTexto(texto) {
     const { texto: t, apreciados } = limparMinuta(texto);
@@ -405,7 +419,7 @@
       h("button", { class: "btn quiet sm", type: "button", onclick: copiar, text: "Copiar" }),
       S.cap.downloads ? h("button", { class: "btn quiet sm", type: "button", onclick: baixarWord, text: "Word" }) : null] : []);
   }
-  const semMarcadores = (t) => t.replace(/\s?\[P\d+\]/g, "");
+  const semMarcadores = (t) => textoLegado(t).replace(/\s?\[P\d+\]/g, "");
   async function copiar() {
     try { await navigator.clipboard.writeText(semMarcadores(S.caso.minuta)); toast("Minuta copiada."); }
     catch (e) { S.minAba = "editar"; renderMinuta(); $("#editor").select(); toast("Selecione e copie no editor."); }
