@@ -106,7 +106,10 @@
       .replace(/\[(P\d+)\]/g, (m, id) => nomePedido(id) || m)
       .replace(/⟦Pág\. (\d+)⟧/g, (m, n) => citacaoDaFolha(Number(n)))
       .replace(/⟦Mov\. (\d+) · Arq\. (\d+) · Pág\. (\d+)[^⟧]*⟧/g, "Mov. $1, Arq. $2, Pág. $3")
-      .replace(/⟦PDF (\d+)⟧/g, "fl. $1");
+      .replace(/⟦PDF (\d+)⟧/g, "fl. $1")
+      .replace(/⟦([^⟧]*)⟧/g, (m, x) => x.replace(/\s*\|\s*PDF\s*\d+/i, "").replace(/\s*·\s*/g, ", ").trim())
+      // sobras de referência apagada: "(Mov. 1, arq. X, )", "( )", "( Mov. 1"
+      .replace(/[ \t]*,[ \t]*;/g, ";").replace(/[ \t]*[,;][ \t]*\)/g, ")").replace(/[ \t]*\([ \t]*[,;]?[ \t]*\)/g, "").replace(/\([ \t]+/g, "(").replace(/[ \t]+\)/g, ")");
   }
   const REF = /(⟦[^⟧]*⟧|\bMov(?:\.|imentação)\s?\d+\s*[,;–-]?\s*Arq(?:\.|uivo)\s?\d+\s*[,;–-]?\s*Págs?(?:\.|inas?)?\s?\d+(?:\s?[-–]\s?\d+)?|\bArq(?:\.|uivo)\s?\d+\s*[,;–-]?\s*Págs?(?:\.|inas?)?\s?\d+(?:\s?[-–]\s?\d+)?|\bfls?\.\s?\d+(?: dos autos digitais)?|\b(?:Mov|Arq|Pág|Evento)\.?\s?\d+(?:[.-]\d+)?|\[P\d+\])/g;
   function irParaPagina(n) { S.pagina = n; painel("p-autos"); renderPagina(); }
@@ -165,7 +168,7 @@
     for (const b of estrutura(textoLegado(text || ""))) {
       if (/^h\d$/.test(b.tipo)) frag.append(h(b.tipo, null, inline(b.texto)));
       else if (b.tipo === "ul") frag.append(h("ul", null, b.itens.map((x) => h("li", null, inline(x)))));
-      else frag.append(h("p", { class: b.tipo === "cit" ? "cit" : b.tipo === "item" ? "item" : null }, inline(b.texto)));
+      else frag.append(h("p", { class: b.tipo === "cit" ? "cit" : b.tipo === "item" ? "num" : null }, inline(b.texto)));
     }
     return frag;
   }
