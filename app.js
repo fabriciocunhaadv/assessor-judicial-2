@@ -745,11 +745,14 @@
   });
 
   // ───────── Banco de teses do gabinete ─────────
-  const TIPOS_TESE = ["Súmula", "Súmula vinculante", "Tema repetitivo", "Repercussão geral", "IRDR/IAC", "Enunciado", "Artigo de lei", "Jurisprudência", "Tese do gabinete"];
+  const TIPOS_TESE = ["Súmula", "Súmula vinculante", "Tema repetitivo", "Repercussão geral", "IRDR/IAC", "Enunciado", "Informativo", "Artigo de lei", "Jurisprudência", "Tese do gabinete"];
   clear($("#ts-tipo"), TIPOS_TESE.map((t) => h("option", { value: t, text: t })));
   clear($("#ts-area"), h("option", { value: "Todas", text: "Todas as áreas" }), AREAS.map((a) => h("option", { value: a, text: a })));
   clear($("#ts-fa"), h("option", { value: "", text: "Todas as áreas" }), AREAS.map((a) => h("option", { value: a, text: a })));
-  let tsEdit = null;
+  let tsEdit = null, tsTrib = "", tsPag = 0;
+  const TRIBS = ["TJGO", "STF", "STJ", "TNU"], POR_PAG = 20;
+  const tribDe = (t) => { const f = String(t.fonte || "").toUpperCase().replace(/\s+/g, ""); return TRIBS.find((x) => f === x || f.startsWith(x)) || "Outros"; };
+  const rotuloTese = (t) => t.tipo === "Informativo" ? `Info ${t.numero}` : t.tipo === "Súmula vinculante" ? `SV ${t.numero}` : /^\d/.test(t.numero || "") ? `${t.tipo.split(" ")[0]} ${t.numero}` : t.tipo;
   function tesesDaMinuta() {
     const pr = S.prompts.find((x) => x.id === S.promptId);
     return AJ.selecionarTeses(S.teses, `${S.caso.minuta} ${S.caso.resumo || ""}`, { area: pr ? pr.area : "" });
@@ -758,20 +761,34 @@
   $("#ts-fa").addEventListener("change", renderTeses);
   function renderTeses() {
     const q = $("#ts-q").value.trim().toLowerCase(), fa = $("#ts-fa").value;
-    const lista = S.teses.filter((x) => (!fa || x.area === fa || x.area === "Todas") && (!q || `${P.nomeTese(x)} ${x.assuntos || ""} ${x.texto}`.toLowerCase().includes(q)));
+    const base = S.teses.filter((x) => (!fa || x.area === fa || x.area === "Todas") && (!q || `${P.nomeTese(x)} ${x.titulo || ""} ${x.assuntos || ""} ${x.texto}`.toLowerCase().includes(q)));
+    const lista = base.filter((x) => !tsTrib || tribDe(x) === tsTrib);
+    const cont = (t) => base.filter((x) => tribDe(x) === t).length;
+    clear($("#ts-trib"), ["", ...TRIBS, "Outros"].filter((t) => !t || t === tsTrib || cont(t)).map((t) => h("button", { type: "button", role: "radio", "aria-checked": String(tsTrib === t), onclick: () => { tsTrib = t; tsPag = 0; renderTeses(); }, text: `${t || "Todos"} · ${t ? cont(t) : base.length}` })));
     $("#ts-h").textContent = `Teses · ${S.teses.length}`;
-    clear($("#ts-list"), lista.length ? lista.map((x) => h("div", { class: "item" },
-      h("div", { class: "row" }, h("span", null, h("strong", { text: P.nomeTese(x) }), " ", h("span", { class: "tag", text: x.area === "Todas" ? "Todas as áreas" : x.area }), x.sempre ? h("span", { class: "tag", text: "usar sempre" }) : null),
+    const paginas = Math.max(1, Math.ceil(lista.length / POR_PAG)); if (tsPag >= paginas) tsPag = paginas - 1;
+    const copiarTese = async (x) => { try { await navigator.clipboard.writeText(`"${x.texto}" (${P.nomeTese(x)}${x.processo ? `, ${x.processo}` : ""})`); toast("Texto copiado."); } catch (e) { toast("Não foi possível copiar."); } };
+    clear($("#ts-list"), lista.length ? lista.slice(tsPag * POR_PAG, (tsPag + 1) * POR_PAG).map((x) => h("div", { class: "item" },
+      h("div", { class: "row" }, h("span", null, h("span", { class: "badge", text: rotuloTese(x) }), h("span", { class: "tag", text: tribDe(x) === "Outros" ? x.fonte || "—" : tribDe(x) }), " ", h("strong", { text: x.titulo || P.nomeTese(x) }), x.sempre ? h("span", { class: "tag", text: "usar sempre" }) : null),
         h("div", { class: "row" },
+          h("button", { class: "btn sm quiet", type: "button", onclick: () => copiarTese(x), text: "Copiar" }),
           h("button", { class: "btn sm quiet", type: "button", onclick: () => editarTese(x), text: "Editar" }),
           h("button", { class: "btn sm quiet", type: "button", onclick: () => confirmar($("#ts-list"), `Remover “${P.nomeTese(x)}”?`, () => apagar("teses", x.id, () => { S.teses = S.teses.filter((y) => y.id !== x.id); renderTeses(); })), text: "Remover" }))),
-      h("p", { class: "cit-t", text: x.texto.slice(0, 400) + (x.texto.length > 400 ? "…" : "") }),
-      x.assuntos || x.quando ? h("p", { class: "muted small", text: [x.assuntos ? "Assuntos: " + x.assuntos : "", x.quando ? "Quando usar: " + x.quando : ""].filter(Boolean).join(" · ") }) : null))
-      : [h("p", { class: "muted small", text: S.teses.length ? "Nenhuma tese com esse filtro." : "Nenhuma tese ainda. Cadastre as súmulas, temas e artigos que o gabinete usa, com o texto conferido na fonte oficial." })]);
+      h("p", { class: "cit-t", text: `“${x.texto.slice(0, 600)}${x.texto.length > 600 ? "…" : ""}”` }),
+      h("div", { class: "tags" },
+        x.assuntos ? h("span", { text: x.assuntos.split(/\s*,\s*/).filter(Boolean).map((a) => "#" + a.replace(/\s+/g, "")).join(" ") }) : null,
+        x.processo ? h("span", { text: x.processo }) : null,
+        h("span", { text: "Área: " + (x.area === "Todas" ? "todas" : x.area) }),
+        x.origem ? h("span", { text: "PDF: " + x.origem }) : null),
+      x.quando ? h("p", { class: "muted small", text: "Quando usar: " + x.quando }) : null))
+      : [h("p", { class: "muted small", text: S.teses.length ? "Nenhuma tese com esse filtro." : "Nenhuma tese ainda. Anexe o PDF de um informativo ou de uma lista de súmulas, ou cadastre à mão com o texto conferido na fonte oficial." })]);
+    clear($("#ts-pag"), lista.length > POR_PAG ? [
+      h("span", { class: "small muted", text: `Mostrando ${tsPag * POR_PAG + 1} a ${Math.min(lista.length, (tsPag + 1) * POR_PAG)} de ${lista.length}` }),
+      h("div", { class: "row" }, h("button", { class: "btn quiet sm", type: "button", disabled: tsPag === 0, onclick: () => { tsPag--; renderTeses(); }, text: "‹" }), h("span", { class: "small", text: `${tsPag + 1} / ${paginas}` }), h("button", { class: "btn quiet sm", type: "button", disabled: tsPag >= paginas - 1, onclick: () => { tsPag++; renderTeses(); }, text: "›" }))] : []);
   }
   function editarTese(x) {
     tsEdit = x ? x.id : null; $("#ts-form-h").textContent = x ? "Editar tese" : "Nova tese";
-    $("#ts-tipo").value = x ? x.tipo : TIPOS_TESE[0]; $("#ts-numero").value = x ? x.numero : ""; $("#ts-fonte").value = x ? x.fonte || "" : "";
+    $("#ts-tipo").value = x ? x.tipo : TIPOS_TESE[0]; $("#ts-numero").value = x ? x.numero : ""; $("#ts-titulo").value = x ? x.titulo || "" : ""; $("#ts-fonte").value = x ? x.fonte || "" : "";
     $("#ts-area").value = x ? x.area || "Todas" : "Todas"; $("#ts-texto").value = x ? x.texto : ""; $("#ts-assuntos").value = x ? x.assuntos || "" : "";
     $("#ts-quando").value = x ? x.quando || "" : ""; $("#ts-sempre").checked = !!(x && x.sempre);
     if (x) $("#ts-numero").focus();
@@ -779,15 +796,17 @@
   $("#ts-limpar").addEventListener("click", () => editarTese(null));
   $("#ts-form").addEventListener("submit", async (e) => {
     e.preventDefault();
-    const d = { tipo: $("#ts-tipo").value, numero: $("#ts-numero").value.trim(), fonte: $("#ts-fonte").value.trim(), area: $("#ts-area").value,
+    const antigo = tsEdit ? S.teses.find((y) => y.id === tsEdit) : null;
+    const d = { ...(antigo ? { processo: antigo.processo || "", origem: antigo.origem || "" } : {}), titulo: $("#ts-titulo").value.trim(), tipo: $("#ts-tipo").value, numero: $("#ts-numero").value.trim(), fonte: $("#ts-fonte").value.trim(), area: $("#ts-area").value,
       texto: $("#ts-texto").value.trim().slice(0, 20000), assuntos: $("#ts-assuntos").value.trim(), quando: $("#ts-quando").value.trim().slice(0, 2000), sempre: $("#ts-sempre").checked };
     if (!d.numero || d.texto.length < 10) return toast("Informe o número e o texto da tese.");
+    if (!tsEdit && S.teses.some((y) => AJ.mesmaTese(y, d))) return toast("Esta tese já está no banco.");
     const id = tsEdit || novoId();
     if (await gravar("teses", id, d, () => { S.teses = [...S.teses.filter((y) => y.id !== id), { ...d, id }]; renderTeses(); })) { editarTese(null); toast("Tese salva."); }
   });
   $("#ts-exp").addEventListener("click", async () => {
     if (!S.cap.downloads) return toast("Download indisponível nesta visualização.");
-    const dados = JSON.stringify({ tipo: "assessor-tjgo/teses", versao: 1, teses: S.teses.map(({ tipo, numero, fonte, area, texto, assuntos, quando, sempre }) => ({ tipo, numero, fonte, area, texto, assuntos, quando, sempre })) }, null, 2);
+    const dados = JSON.stringify({ tipo: "assessor-tjgo/teses", versao: 1, teses: S.teses.map(({ tipo, numero, fonte, titulo, processo, area, texto, assuntos, quando, sempre, origem }) => ({ tipo, numero, fonte, titulo, processo, area, texto, assuntos, quando, sempre, origem })) }, null, 2);
     try { await S.cap.downloads.save({ filename: "teses.json", data: dados }); } catch (e) { if (e && e.code !== "declined") toast("Não foi possível salvar."); }
   });
   $("#ts-imp").addEventListener("change", async () => {
@@ -803,16 +822,90 @@
         texto: String(x.texto || x.enunciado || x.conteudo || x.content || "").trim().slice(0, 20000),
         assuntos: String(x.assuntos || (Array.isArray(x.palavrasChave) ? x.palavrasChave.join(", ") : Array.isArray(x.tags) ? x.tags.join(", ") : "")).slice(0, 300),
         quando: String(x.quando || x.observacao || "").slice(0, 2000), sempre: !!x.sempre,
+        titulo: String(x.titulo && x.numero ? x.titulo : "").slice(0, 200), processo: String(x.processo || "").slice(0, 200), origem: String(x.origem || "").slice(0, 200),
       })).filter((x) => x.numero && x.texto.length >= 10);
       if (!lista.length) return toast("Nenhuma tese válida no arquivo.");
       let n = 0;
       for (const d of lista) { // só acrescenta: nunca sobrescreve as existentes
-        if (S.teses.some((y) => y.numero === d.numero && y.texto === d.texto)) continue;
+        if (S.teses.some((y) => (y.numero === d.numero && y.texto === d.texto) || AJ.mesmaTese(y, d))) continue;
         const id = novoId();
         if (await gravar("teses", id, d, () => S.teses.push({ ...d, id }))) n++;
       }
       renderTeses(); toast(`${n} tese(s) importada(s).`);
     } catch (e) { toast("Arquivo JSON inválido."); }
+  });
+
+  // Lançamento automático: PDF de informativo, súmulas ou teses → o Claude extrai cada item com o texto literal.
+  let tsCtl = null;
+  $("#ts-parar").addEventListener("click", () => tsCtl && tsCtl.abort());
+  $("#ts-pdf").addEventListener("change", async () => {
+    const arquivos = [...$("#ts-pdf").files]; $("#ts-pdf").value = "";
+    if (!arquivos.length || tsCtl) return;
+    showErr($("#ts-err"), null);
+    if (!S.cap.sample) return showErr($("#ts-err"), "Abra a página no claude.ai para o Claude organizar o PDF.");
+    if (!pdfjs) return showErr($("#ts-err"), "O leitor de PDF não carregou. Recarregue a página.");
+    tsCtl = new AbortController(); const signal = tsCtl.signal;
+    const prog = (t, pct, sub) => { $("#ts-prog").hidden = false; $("#ts-prog-t").textContent = t; $("#ts-prog-bar").style.width = Math.round(pct * 100) + "%"; $("#ts-prog-s").textContent = sub || ""; };
+    let novas = 0, repetidas = 0, falhas = 0;
+    try {
+      for (const [k, file] of arquivos.entries()) {
+        const nome = file.name.replace(/\.pdf$/i, ""), pre = arquivos.length > 1 ? `PDF ${k + 1} de ${arquivos.length} · ` : "";
+        const doc = await pdfjs.getDocument({ data: new Uint8Array(await file.arrayBuffer()), isEvalSupported: false }).promise;
+        const paginas = [];
+        for (let n = 1; n <= doc.numPages; n++) {
+          if (signal.aborted) throw { code: "cancelled" };
+          const pg = await doc.getPage(n), ct = await pg.getTextContent();
+          let linha = "", txt = "";
+          for (const it of ct.items) { if (!("str" in it)) continue; linha += it.str; if (it.hasEOL) { txt += linha + "\n"; linha = ""; } }
+          paginas.push(`[Página ${n}]\n${txt}${linha}`); pg.cleanup();
+          prog(`${pre}Lendo ${file.name}`, n / doc.numPages * 0.15, `Página ${n} de ${doc.numPages}`);
+        }
+        const texto = paginas.join("\n");
+        if (texto.replace(/\[Página \d+\]|\s/g, "").length < 200) { showErr($("#ts-err"), `“${file.name}” não tem texto selecionável (PDF digitalizado como imagem). Use o PDF original do tribunal.`); continue; }
+        const blocos = AJ.chunkText(texto, 24000);
+        let feitos = 0;
+        const lancar = async (itens) => {
+          for (const it of itens || []) {
+            const d = {
+              tipo: TIPOS_TESE.includes(it.tipo) ? it.tipo : "Jurisprudência", numero: String(it.numero || "").trim().slice(0, 120), fonte: String(it.tribunal || "").trim().slice(0, 80),
+              titulo: String(it.titulo || "").trim().slice(0, 200), texto: String(it.texto || "").replace(/\s+/g, " ").trim().slice(0, 20000),
+              assuntos: (Array.isArray(it.assuntos) ? it.assuntos : String(it.assuntos || "").split(",")).map((a) => String(a).trim()).filter(Boolean).slice(0, 6).join(", "),
+              area: it.area === "Todas" || AREAS.includes(it.area) ? it.area : "Todas", processo: String(it.processo || "").trim().slice(0, 200),
+              quando: "", sempre: false, origem: `${nome}${it.pagina ? `, pág. ${it.pagina}` : ""}`.slice(0, 200),
+            };
+            if (d.texto.length < 20) continue;
+            if (!d.numero) d.numero = d.titulo || "s/n";
+            if (S.teses.some((y) => AJ.mesmaTese(y, d))) { repetidas++; continue; }
+            const id = novoId();
+            if (await gravar("teses", id, d, () => {})) { S.teses.push({ ...d, id }); novas++; }
+          }
+          renderTeses();
+        };
+        const fila = blocos.map((b, i) => i);
+        const trabalhador = async () => {
+          while (fila.length) {
+            const i = fila.shift();
+            if (signal.aborted) throw { code: "cancelled" };
+            let r = null;
+            for (let tent = 0; tent < 3 && !r; tent++) {
+              try { r = await ask(P.extrairTeses(blocos[i], file.name, i + 1, blocos.length, AREAS), { json: true, signal }); }
+              catch (e) {
+                if (e && ["cancelled", "not_granted", "sampling_disabled", "session_expired", "capability_disabled"].includes(e.code)) throw e;
+                if (tent < 2) await new Promise((ok) => setTimeout(ok, 15000 * (tent + 1)));
+              }
+            }
+            if (r) await lancar(r.itens); else falhas++;
+            feitos++; prog(`${pre}O Claude está organizando ${file.name}`, 0.15 + feitos / blocos.length * 0.85, `Bloco ${feitos} de ${blocos.length} · ${novas} nova(s) · ${repetidas} já estavam no banco`);
+          }
+        };
+        prog(`${pre}O Claude está organizando ${file.name}`, 0.15, `Bloco 0 de ${blocos.length}`);
+        await Promise.all(Array.from({ length: Math.min(3, blocos.length) }, trabalhador));
+      }
+      toast(`${novas} tese(s) lançada(s)${repetidas ? `, ${repetidas} já estavam no banco` : ""}.`);
+      if (falhas) showErr($("#ts-err"), `${falhas} bloco(s) não puderam ser lidos pelo Claude. Anexe o PDF de novo para tentar: o que já foi lançado não se repete.`);
+    } catch (e) {
+      if (e && e.code === "cancelled") toast(`Interrompido. ${novas} tese(s) lançada(s).`); else showErr($("#ts-err"), e);
+    } finally { tsCtl = null; $("#ts-prog").hidden = true; renderTeses(); }
   });
 
   // ───────── Histórico (privado por pessoa) ─────────

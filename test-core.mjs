@@ -41,5 +41,7 @@ const banco = [
 ];
 t("teses: tudo que cabe, filtrado pela área", AJ.selecionarTeses(banco, "", { area: "Juizado Especial Cível" }).map((x) => x.numero).join() === "Fixação,297");
 t("teses: sem caber, ranqueia pelo caso", AJ.selecionarTeses(banco, "contrato com banco e consumidor", { maxBytes: 450 }).map((x) => x.numero).join() === "Fixação,297");
+t("mesma tese", AJ.mesmaTese({ tipo: "Súmula", numero: "297", fonte: "STJ" }, { tipo: "Súmula", numero: "297", fonte: "stj" }) && !AJ.mesmaTese({ tipo: "Súmula", numero: "297", fonte: "STJ" }, { tipo: "Súmula", numero: "297", fonte: "STF" })
+  && AJ.mesmaTese({ tipo: "Informativo", numero: "726", texto: "Na autolavagem não ocorre a consunção entre a corrupção passiva e a lavagem." }, { tipo: "Informativo", numero: "726", texto: "Na autolavagem, não ocorre a consunção entre a corrupção passiva e a lavagem!" }));
 console.log(`${ok} ok, ${fail} falhas`);
 if (fail) process.exit(1);
