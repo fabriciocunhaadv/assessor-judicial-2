@@ -846,7 +846,7 @@
     if (!pdfjs) return showErr($("#ts-err"), "O leitor de PDF não carregou. Recarregue a página.");
     tsCtl = new AbortController(); const signal = tsCtl.signal;
     const prog = (t, pct, sub) => { $("#ts-prog").hidden = false; $("#ts-prog-t").textContent = t; $("#ts-prog-bar").style.width = Math.round(pct * 100) + "%"; $("#ts-prog-s").textContent = sub || ""; };
-    let novas = 0, repetidas = 0, falhas = 0;
+    let novas = 0, repetidas = 0, falhas = 0, ultimo = "";
     try {
       for (const [k, file] of arquivos.entries()) {
         const nome = file.name.replace(/\.pdf$/i, ""), pre = arquivos.length > 1 ? `PDF ${k + 1} de ${arquivos.length} · ` : "";
@@ -862,8 +862,17 @@
         }
         const texto = paginas.join("\n");
         if (texto.replace(/\[Página \d+\]|\s/g, "").length < 200) { showErr($("#ts-err"), `“${file.name}” não tem texto selecionável (PDF digitalizado como imagem). Use o PDF original do tribunal.`); continue; }
-        const blocos = AJ.chunkText(texto, 24000);
-        let feitos = 0;
+        // Blocos pequenos: a resposta (todas as teses com o texto literal) precisa caber no limite de tamanho do Claude.
+        const fila = AJ.chunkText(texto, 9000);
+        let feitos = 0, total = fila.length; ultimo = "";
+        const lendo = new Map(), t0 = Date.now();
+        const aviso = () => {
+          const seg = Math.round((Date.now() - t0) / 1000), agora = [...lendo.values()];
+          prog(`${pre}O Claude está organizando ${file.name}`, 0.15 + feitos / total * 0.85,
+            `Bloco ${feitos} de ${total} concluído(s) · ${novas} nova(s) · ${repetidas} já estavam no banco · ${Math.floor(seg / 60)}:${String(seg % 60).padStart(2, "0")}`
+            + (agora.length ? ` · recebendo agora: ${agora.reduce((n, x) => n + x, 0)} item(ns)` : "") + (ultimo ? ` · ${ultimo}` : ""));
+        };
+        const relogio = setInterval(aviso, 1000);
         const lancar = async (itens) => {
           for (const it of itens || []) {
             const d = {
@@ -879,30 +888,38 @@
             const id = novoId();
             if (await gravar("teses", id, d, () => {})) { S.teses.push({ ...d, id }); novas++; }
           }
-          renderTeses();
+          renderTeses(); aviso();
         };
-        const fila = blocos.map((b, i) => i);
+        let chave = 0;
         const trabalhador = async () => {
           while (fila.length) {
-            const i = fila.shift();
+            const trecho = fila.shift(), k = ++chave;
             if (signal.aborted) throw { code: "cancelled" };
             let r = null;
             for (let tent = 0; tent < 3 && !r; tent++) {
-              try { r = await ask(P.extrairTeses(blocos[i], file.name, i + 1, blocos.length, AREAS), { json: true, signal }); }
+              lendo.set(k, 0);
+              try { r = await ask(P.extrairTeses(trecho, file.name, feitos + 1, total, AREAS), { json: true, signal, onText: ({ text }) => lendo.set(k, (text.match(/"texto"\s*:/g) || []).length) }); }
               catch (e) {
-                if (e && ["cancelled", "not_granted", "sampling_disabled", "session_expired", "capability_disabled"].includes(e.code)) throw e;
-                if (tent < 2) await new Promise((ok) => setTimeout(ok, 15000 * (tent + 1)));
-              }
+                if (e && ["cancelled", "not_granted", "sampling_disabled", "session_expired", "capability_disabled", "refused"].includes(e.code)) throw e;
+                if (e && e.code === "invalid_json") {
+                  // Resposta cortada: lança o que veio completo e divide o trecho em dois (pede menos, não repete igual).
+                  await lancar(AJ.itensParciais(e.text));
+                  if (trecho.length > 2500) { const meio = trecho.lastIndexOf("\n", trecho.length / 2) > 0 ? trecho.lastIndexOf("\n", trecho.length / 2) : Math.floor(trecho.length / 2); fila.unshift(trecho.slice(0, meio), trecho.slice(meio)); total++; ultimo = "resposta longa demais: trecho dividido em dois"; r = { itens: [], dividido: true }; break; }
+                }
+                ultimo = `última falha: ${errMsg(e)}`;
+                if (tent < 2) await new Promise((ok) => setTimeout(ok, (e && e.code === "rate_limited" ? 30000 : 10000) * (tent + 1)));
+              } finally { lendo.delete(k); }
             }
+            if (r && r.dividido) continue;
             if (r) await lancar(r.itens); else falhas++;
-            feitos++; prog(`${pre}O Claude está organizando ${file.name}`, 0.15 + feitos / blocos.length * 0.85, `Bloco ${feitos} de ${blocos.length} · ${novas} nova(s) · ${repetidas} já estavam no banco`);
+            feitos++; aviso();
           }
         };
-        prog(`${pre}O Claude está organizando ${file.name}`, 0.15, `Bloco 0 de ${blocos.length}`);
-        await Promise.all(Array.from({ length: Math.min(3, blocos.length) }, trabalhador));
+        aviso();
+        try { await Promise.all(Array.from({ length: Math.min(3, fila.length) }, trabalhador)); } finally { clearInterval(relogio); }
       }
       toast(`${novas} tese(s) lançada(s)${repetidas ? `, ${repetidas} já estavam no banco` : ""}.`);
-      if (falhas) showErr($("#ts-err"), `${falhas} bloco(s) não puderam ser lidos pelo Claude. Anexe o PDF de novo para tentar: o que já foi lançado não se repete.`);
+      if (falhas) showErr($("#ts-err"), `${falhas} bloco(s) não puderam ser lidos pelo Claude (${ultimo.replace(/^última falha: /, "")}). Anexe o PDF de novo para tentar: o que já foi lançado não se repete.`);
     } catch (e) {
       if (e && e.code === "cancelled") toast(`Interrompido. ${novas} tese(s) lançada(s).`); else showErr($("#ts-err"), e);
     } finally { tsCtl = null; $("#ts-prog").hidden = true; renderTeses(); }
