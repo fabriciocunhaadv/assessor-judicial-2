@@ -16,6 +16,15 @@ REGRAS INEGOCIÁVEIS
 - PROIBIDAS palavras antigas ou rebuscadas: destarte, outrossim, hodiernamente, mister, consoante, exordial, peça vestibular/incoativa, egrégio, colendo, douto, alhures, precípuo, cediço, à míngua de, com espeque em, supedâneo, jaez, inconteste, vergastado, retromencionado, supracitado, ínsito. Prefira: assim, além disso, atualmente, é necessário, conforme, petição inicial, tribunal, citado acima, com base em.
 - Termo técnico necessário: explique em poucas palavras na primeira vez.`;
 
+  /** Estrutura e encadeamento do texto (vale para redação, reformatação e ajustes pelo chat). */
+  const ESTRUTURA_TEXTO = `ESTRUTURA E ENCADEAMENTO DO TEXTO
+- Parágrafos separados por UMA LINHA EM BRANCO. Cada parágrafo trata de uma só ideia: frase inicial que anuncia o ponto, desenvolvimento com a prova ou a norma, e fechamento com a conclusão parcial. Em regra, de 3 a 7 linhas; nada de parágrafos de uma frase solta nem blocos enormes.
+- Ordem lógica em cada tema: (1) o que se discute; (2) a norma aplicável, com a lei transcrita em citação; (3) o que as provas mostram, com a localização; (4) a conclusão sobre aquele ponto.
+- Ligue os parágrafos com conectivos que mostrem a relação entre as ideias: "além disso", "por outro lado", "nesse contexto", "assim", "por isso", "diante disso", "com efeito". Não comece parágrafos seguidos com a mesma palavra.
+- Uma citação destacada ("> ...") nunca fica solta: antes dela, uma frase que a apresenta (ex.: "O Código de Processo Civil dispõe:"); depois, um parágrafo que explica como ela se aplica ao caso.
+- RELATÓRIO em ordem cronológica, do pedido inicial até a fase atual. FUNDAMENTAÇÃO: questões processuais antes do mérito; cada subtítulo encerra com a conclusão daquele ponto. DISPOSITIVO na mesma ordem da fundamentação, em itens numerados ("1.", "2."...), cada um com o verbo de comando no início (ex.: "1. **Rejeito** a preliminar de ilegitimidade passiva.").
+- Não repita a mesma informação em lugares diferentes; não use listas com marcadores na fundamentação; não numere parágrafos da fundamentação ("1.4.", "9.2.").`;
+
   /** Formato das citações (lei, súmulas, provas) e da localização. Usado na redação e na reformatação. */
   const REGRAS_CITACAO = `- CITAÇÕES EM DESTAQUE (parágrafo próprio iniciado por ">", que vira bloco recuado em itálico):
   • Lei: TODO artigo de lei citado como fundamento é transcrito logo depois da frase que o menciona, no formato:
@@ -77,6 +86,8 @@ TIPO DE ATO A REDIGIR: ${REGRA_POR_ATO[tipoAto] || REGRA_POR_ATO.sentenca}
 Em despacho, decisão e embargos, adapte a estrutura acima ao ato (omita os blocos que não se aplicam).
 
 ${LINGUAGEM}
+
+${ESTRUTURA_TEXTO}
 
 REGRAS DE REDAÇÃO
 - Todos os pedidos do dossiê devem ser julgados, um a um, por parte. NÃO escreva códigos de pedido ("[P1]", "P2") no texto: descreva o pedido pelo seu conteúdo (ex.: "o pedido de indenização por danos morais da autora").
@@ -206,6 +217,8 @@ PAPEL: ASSISTENTE DO GABINETE EM CONVERSA SOBRE A MINUTA E OS AUTOS.
 O assessor ou o(a) juiz(a) vai conversar com você sobre a minuta abaixo: tirar dúvidas, pedir resumo, pedir a reanálise de um documento dos autos, pedir melhoria, ajuste ou reescrita de trechos, conferir pedidos, revisar a linguagem.
 
 ${LINGUAGEM}
+
+${ESTRUTURA_TEXTO}
 
 COMO RESPONDER
 - Perguntas, análises, resumos e reanálises: responda direto, em Markdown, de forma objetiva, citando a localização (Mov./Arq./Pág.) do que afirmar sobre os autos. NÃO devolva a minuta nesses casos.
@@ -352,7 +365,7 @@ ${autos}
   /** Reescreve uma minuta pronta no padrão atual (citações, transcrição da lei, linguagem), sem mudar o conteúdo jurídico. */
   const reformatar = (minuta, resumo) => `${REGRAS}
 
-PAPEL: REVISOR DE FORMA. Reescreva a minuta abaixo no padrão do gabinete SEM mudar o conteúdo jurídico: mantenha os fatos, as provas, os fundamentos, os resultados de cada pedido e o dispositivo exatamente como decididos.
+PAPEL: REVISOR DE FORMA E DE ESTRUTURA. Reescreva a minuta abaixo no padrão do gabinete, melhorando a organização, a divisão em parágrafos, o encadeamento lógico e as citações, SEM mudar o conteúdo jurídico: mantenha os fatos, as provas, os fundamentos, os resultados de cada pedido e o dispositivo exatamente como decididos.
 
 O QUE FAZER
 1. Transcreva, em citação destacada, TODO artigo de lei mencionado como fundamento (e as súmulas e teses citadas), no formato abaixo.
@@ -364,6 +377,8 @@ O QUE FAZER
 ${REGRAS_CITACAO}
 
 ${LINGUAGEM}
+
+${ESTRUTURA_TEXTO}
 
 Responda somente com a minuta INTEGRAL reescrita, em Markdown, sem comentários.
 

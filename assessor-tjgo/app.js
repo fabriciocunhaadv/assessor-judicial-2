@@ -135,15 +135,37 @@
       return inlineRefs(p);
     });
   }
+  /** Estrutura do texto em blocos. Cada linha é um parágrafo (o Claude às vezes separa parágrafos com uma só quebra);
+   *  linha partida no meio da frase é religada; ">" seguidos formam uma citação; "- " seguidos, uma lista. */
+  function estrutura(texto) {
+    const blocos = [];
+    let cit = null, lista = null;
+    const fecha = () => { cit = null; lista = null; };
+    for (const bruta of String(texto || "").split("\n")) {
+      const l = bruta.trim();
+      if (!l) { fecha(); continue; }
+      const hm = /^(#{1,3})\s+(.*)$/.exec(l);
+      if (hm) { fecha(); blocos.push({ tipo: "h" + hm[1].length, texto: hm[2] }); continue; }
+      if (/^>/.test(l)) {
+        const c = l.replace(/^>\s?/, "");
+        if (!c) { cit = null; continue; }
+        if (cit) cit.texto += " " + c; else { lista = null; cit = { tipo: "cit", texto: c }; blocos.push(cit); }
+        continue;
+      }
+      if (/^[-*•]\s+/.test(l)) { cit = null; if (!lista) { lista = { tipo: "ul", itens: [] }; blocos.push(lista); } lista.itens.push(l.replace(/^[-*•]\s+/, "")); continue; }
+      fecha();
+      const ult = blocos[blocos.length - 1];
+      if (ult && ult.tipo === "p" && !/[.!?:;…"”)\]]$/.test(ult.texto) && /^[a-zà-ú(,]/.test(l)) { ult.texto += " " + l; continue; }
+      blocos.push({ tipo: /^\d+[.)]\s/.test(l) ? "item" : "p", texto: l });
+    }
+    return blocos;
+  }
   function md(text) {
     const frag = document.createDocumentFragment();
-    for (const block of textoLegado(text || "").split(/\n\s*\n/)) {
-      const t = block.trim(); if (!t) continue;
-      const lines = t.split("\n"), hm = /^(#{1,3})\s+(.*)$/.exec(lines[0]);
-      if (hm) { frag.append(h("h" + hm[1].length, null, inline(hm[2]))); if (lines.length > 1) frag.append(md(lines.slice(1).join("\n"))); continue; }
-      if (lines.every((l) => /^\s*[-*•]\s+/.test(l))) { frag.append(h("ul", null, lines.map((l) => h("li", null, inline(l.replace(/^\s*[-*•]\s+/, "")))))); continue; }
-      if (lines.every((l) => /^\s*>/.test(l))) { frag.append(h("p", { class: "cit" }, inline(lines.map((l) => l.replace(/^\s*>\s?/, "")).join(" ")))); continue; }
-      const p = h("p"); lines.forEach((l, i) => { if (i) p.append(h("br")); p.append(...inline(l)); }); frag.append(p);
+    for (const b of estrutura(textoLegado(text || ""))) {
+      if (/^h\d$/.test(b.tipo)) frag.append(h(b.tipo, null, inline(b.texto)));
+      else if (b.tipo === "ul") frag.append(h("ul", null, b.itens.map((x) => h("li", null, inline(x)))));
+      else frag.append(h("p", { class: b.tipo === "cit" ? "cit" : b.tipo === "item" ? "item" : null }, inline(b.texto)));
     }
     return frag;
   }
@@ -478,13 +500,9 @@
       return out;
     };
     const blocos = [];
-    for (const bloco of semMarcadores(texto).split(/\n\s*\n/)) {
-      const t = bloco.trim(); if (!t) continue;
-      const linhas = t.split("\n"), hm = /^(#{1,3})\s+(.*)$/.exec(linhas[0]);
-      if (hm) { blocos.push({ tipo: "h" + hm[1].length, runs: runs(hm[2]) }); if (linhas.length > 1) blocos.push(...blocosDaMinuta(linhas.slice(1).join("\n"))); continue; }
-      if (linhas.every((l) => /^\s*>/.test(l))) { blocos.push({ tipo: "cit", runs: runs(linhas.map((l) => l.replace(/^\s*>\s?/, "")).join(" ")) }); continue; }
-      if (linhas.every((l) => /^\s*[-*•]\s+/.test(l))) { linhas.forEach((l) => blocos.push({ tipo: "li", runs: runs("• " + l.replace(/^\s*[-*•]\s+/, "")) })); continue; }
-      blocos.push({ tipo: "p", runs: runs(linhas.join(" ")) });
+    for (const b of estrutura(semMarcadores(texto))) {
+      if (b.tipo === "ul") b.itens.forEach((x) => blocos.push({ tipo: "li", runs: runs("• " + x) }));
+      else blocos.push({ tipo: b.tipo === "item" ? "p" : b.tipo, runs: runs(b.texto) });
     }
     return blocos;
   }
@@ -530,10 +548,14 @@
       const medir = (p) => { pdf.setFont("times", p.st); return pdf.getTextWidth(p.w); };
       const espaco = (() => { pdf.setFont("times", "normal"); return pdf.getTextWidth(" "); })();
       const linhas = []; let atual = [], usado = 0, primeira = true;
+      let ant = null;
       for (const p of palavras) {
-        const lw = larg - esq - (primeira ? recuo : 0), pw = medir(p), sep = atual.length ? espaco : 0;
-        if (atual.length && usado + sep + pw > lw) { linhas.push({ ps: atual, usado, lw, primeira }); atual = []; usado = 0; primeira = false; }
-        usado += (atual.length ? espaco : 0) + pw; atual.push({ ...p, pw });
+        const lw = larg - esq - (primeira ? recuo : 0), pw = medir(p);
+        const sep = atual.length && ant && ant.esp ? espaco : 0; // "Após," sem espaço antes da vírgula
+        if (atual.length && ant && ant.esp && usado + sep + pw > lw) { linhas.push({ ps: atual, usado, lw, primeira }); atual = []; usado = 0; primeira = false; }
+        void sep;
+        const gap = atual.length && ant && ant.esp ? espaco : 0;
+        usado += gap + pw; atual.push({ ...p, pw, gap }); ant = p;
       }
       if (atual.length) linhas.push({ ps: atual, usado, lw: larg - esq - (primeira ? recuo : 0), primeira, ultima: true });
       const lh = size * entre; y += antes;
@@ -542,8 +564,9 @@
         let x = M.l + esq + (ln.primeira ? recuo : 0);
         const livre = ln.lw - ln.usado;
         if (alin === "center") x += livre / 2;
-        const extraEsp = alin === "justify" && !ln.ultima && ln.ps.length > 1 ? livre / (ln.ps.length - 1) : 0;
-        ln.ps.forEach((p, k) => { pdf.setFont("times", p.st); pdf.text(p.w, x, y + size); x += p.pw + espaco + extraEsp; void k; });
+        const lacunas = ln.ps.filter((p, k) => k > 0 && p.gap).length;
+        const extraEsp = alin === "justify" && !ln.ultima && lacunas ? livre / lacunas : 0;
+        ln.ps.forEach((p, k) => { if (k > 0 && p.gap) x += p.gap + extraEsp; pdf.setFont("times", p.st); pdf.text(p.w, x, y + size); x += p.pw; });
         y += lh;
       });
       y += depois;

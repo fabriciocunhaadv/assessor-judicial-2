@@ -130,16 +130,21 @@ textarea { resize: vertical; line-height: 1.5; }
 mark { background: var(--warn-soft); color: var(--ink); }
 
 /* Minuta */
-.folha { font: 15.5px/1.72 var(--f-doc); color: var(--ink); overflow-wrap: anywhere; }
-.folha h1 { font-size: 18px; margin: 0 0 12px; }
-.folha h2 { font: 700 14.5px/1.4 var(--f-doc); text-transform: uppercase; letter-spacing: .06em; text-align: center; margin: 24px 0 10px; }
-.folha h3 { font: 600 15px/1.4 var(--f-doc); margin: 18px 0 8px; }
-.folha p { margin: 0 0 11px; text-align: justify; hyphens: auto; }
-.folha p.cit { margin: 6px 0 16px 12%; padding: 10px 14px; border-left: 3px solid color-mix(in srgb, var(--muted) 55%, var(--line)); background: var(--sunk); border-radius: 0 6px 6px 0; font-size: 13.5px; line-height: 1.6; font-style: italic; text-align: justify; }
+/* Folha no padrão de peça: parágrafos justificados com recuo de primeira linha; citações recuadas em itálico. */
+.folha { font: 15.5px/1.75 var(--f-doc); color: var(--ink); overflow-wrap: anywhere; max-width: 78ch; margin: 0 auto; }
+.folha h1 { font: 700 17px/1.4 var(--f-doc); text-align: center; text-transform: uppercase; letter-spacing: .05em; margin: 4px 0 22px; }
+.folha h2 { font: 700 14.5px/1.4 var(--f-doc); text-transform: uppercase; letter-spacing: .06em; text-align: center; margin: 28px 0 14px; }
+.folha h3 { font: 700 15px/1.45 var(--f-doc); margin: 22px 0 10px; }
+.folha p { margin: 0 0 12px; text-align: justify; text-indent: 2.5em; hyphens: auto; }
+.folha p.item { text-indent: 0; padding-left: 2.5em; }
+.msg .folha p { text-indent: 0; }
+.folha p.cit { text-indent: 0; margin: 4px 0 18px 18%; padding: 8px 14px; border-left: 3px solid color-mix(in srgb, var(--muted) 55%, var(--line)); background: var(--sunk); border-radius: 0 6px 6px 0; font-size: 13.5px; line-height: 1.6; font-style: italic; text-align: justify; }
 @media (max-width: 700px) { .folha p.cit { margin-left: 4%; } }
 .folha ul { margin: 0 0 11px; padding-left: 22px; }
 .claude-out { border-left: 4px solid var(--accent); padding-left: 14px; }
 .ref { font: 500 .78em/1 var(--f-mono); background: var(--ref-soft); color: var(--ref); padding: 1px 3px; border-radius: 3px; white-space: nowrap; }
+.folha .ref { font: inherit; background: none; padding: 0; white-space: normal; color: var(--ref); text-decoration: underline dotted; text-underline-offset: 3px; }
+.folha button.ref { background: none; }
 button.ref { border: 0; cursor: pointer; }
 .pid { font: 600 .78em/1 var(--f-mono); color: var(--accent); }
 .editor { width: 100%; min-height: 60vh; font: 14.5px/1.65 var(--f-doc); border: 0; padding: 14px; resize: none; }
