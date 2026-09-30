@@ -32,3 +32,4 @@ t("marcador triplo", txtLoc.includes("⟦Mov. 18 · Arq. 2 · Pág. 1 | PDF 4⟧
 const rod = AJ.detectarLocais(["Mov. 1 - Arq. 1\na\nPág. 1 de 3", "b\nPág. 2 de 3", "Mov. 18 - Arq. 1\nc\nPág. 3 de 3"]);
 t("rodapé do PDF não vira página do arquivo", rod.locais[2].pag === "1" && rod.locais[1].pag === "2");
 console.log(`${ok} ok, ${fail} falhas`);
+if (fail) process.exit(1);
