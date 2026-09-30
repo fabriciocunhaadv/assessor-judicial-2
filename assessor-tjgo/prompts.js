@@ -70,9 +70,14 @@ ${LINGUAGEM}
 
 REGRAS DE REDAÇÃO
 - Todos os pedidos do dossiê devem ser julgados, um a um, por parte. NÃO escreva códigos de pedido ("[P1]", "P2") no texto: descreva o pedido pelo seu conteúdo (ex.: "o pedido de indenização por danos morais da autora").
-- Citação de lei: transcreva entre aspas, em parágrafo próprio iniciado por ">", o trecho do dispositivo legal que fundamenta a conclusão, com a referência (ex.: art. 14 do Código de Defesa do Consumidor). Transcreva só o que tiver certeza da redação; se não tiver, cite o artigo sem transcrever.
+- CITAÇÕES EM DESTAQUE (parágrafo próprio iniciado por ">", que vira bloco recuado em itálico):
+  • Lei: TODO artigo de lei citado como fundamento é transcrito logo depois da frase que o menciona, no formato:
+    > "Art. 14. O fornecedor de serviços responde, independentemente da existência de culpa, pela reparação dos danos causados aos consumidores [...]" (art. 14, caput, do Código de Defesa do Consumidor).
+    Transcreva o caput e só os parágrafos/incisos pertinentes, usando [...] para as omissões. Se não tiver certeza da redação literal, escreva "(transcrição a conferir)" depois da referência — nunca invente texto de lei.
+  • Súmulas e teses: > "Súmula 479 do STJ: As instituições financeiras respondem objetivamente pelos danos gerados por fortuito interno relativo a fraudes e delitos praticados por terceiros no âmbito de operações bancárias."
+  • Provas decisivas (depoimentos, laudos, contratos): transcreva o trecho literal entre aspas com a localização ao final, ex.: > "a autora desconhecia a conta indicada" (Mov. 30, Arq. 1, Pág. 2).
 - Jurisprudência: cite súmulas e teses do STF, STJ e TNU (súmulas vinculantes, temas de repercussão geral e de recursos repetitivos) e entendimentos do TJGO com o número e o enunciado entre aspas, em parágrafo próprio iniciado por ">". Use apenas enunciados que você conhece com segurança ou que constem da lista de precedentes abaixo; nunca invente número de súmula, tema, acórdão ou relator.
-- Localização das provas no formato "(Mov. 30, Arq. 1, Pág. 2)", sem repetir a mesma referência a cada frase.
+- Localização das provas no formato "(Mov. 30, Arq. 1, Pág. 2)"; intervalo de páginas: "(Mov. 1, Arq. 2, Págs. 1-4)"; vários arquivos da mesma movimentação: "(Mov. 10, Arq. 1, Págs. 1-3 e Arq. 10, Págs. 1-3)". Não repita a mesma referência a cada frase.
 - Na ÚLTIMA linha, depois do texto, escreva exatamente "===PEDIDOS APRECIADOS: " seguido dos ids do dossiê que você julgou, separados por vírgula, e "===" (ex.: ===PEDIDOS APRECIADOS: P1, P2, P3===). Essa linha é removida automaticamente e não faz parte da minuta.
 - Dispositivo: liquide os consectários conforme a Lei nº 14.905/2024 — correção monetária pelo IPCA (art. 389, parágrafo único, do CC) e juros de mora pela taxa legal (Selic deduzido o IPCA, art. 406, §§ 1º e 3º, do CC), com termos iniciais (Súmulas 43, 54 e 362 do STJ, quando cabíveis). Em Juizado Especial, observe os arts. 54 e 55 da Lei nº 9.099/95.
 ${tipoAto === "sentenca" ? "- Proibida minuta telegráfica: a FUNDAMENTAÇÃO deve ter no mínimo 14 parágrafos densos (em regra 14 a 20 ou mais), proporcionais à complexidade.\n" : ""}- Use **negrito** apenas em títulos internos e no resultado de cada pedido; *itálico* para destacar termos, sem exagero.

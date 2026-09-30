@@ -135,7 +135,8 @@ mark { background: var(--warn-soft); color: var(--ink); }
 .folha h2 { font: 700 14.5px/1.4 var(--f-doc); text-transform: uppercase; letter-spacing: .06em; text-align: center; margin: 24px 0 10px; }
 .folha h3 { font: 600 15px/1.4 var(--f-doc); margin: 18px 0 8px; }
 .folha p { margin: 0 0 11px; text-align: justify; hyphens: auto; }
-.folha p.cit { margin-left: 4ch; font-size: 14.5px; font-style: italic; }
+.folha p.cit { margin: 6px 0 16px 12%; padding: 10px 14px; border-left: 3px solid color-mix(in srgb, var(--muted) 55%, var(--line)); background: var(--sunk); border-radius: 0 6px 6px 0; font-size: 13.5px; line-height: 1.6; font-style: italic; text-align: justify; }
+@media (max-width: 700px) { .folha p.cit { margin-left: 4%; } }
 .folha ul { margin: 0 0 11px; padding-left: 22px; }
 .claude-out { border-left: 4px solid var(--accent); padding-left: 14px; }
 .ref { font: 500 .78em/1 var(--f-mono); background: var(--ref-soft); color: var(--ref); padding: 1px 3px; border-radius: 3px; white-space: nowrap; }

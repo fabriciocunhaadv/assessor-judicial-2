@@ -103,7 +103,7 @@
       .replace(/⟦Mov\. (\d+) · Arq\. (\d+) · Pág\. (\d+)[^⟧]*⟧/g, "Mov. $1, Arq. $2, Pág. $3")
       .replace(/⟦PDF (\d+)⟧/g, "fl. $1");
   }
-  const REF = /(⟦[^⟧]*⟧|\bMov(?:\.|imentação)\s?\d+\s*[,;–-]?\s*Arq(?:\.|uivo)\s?\d+\s*[,;–-]?\s*Pág(?:\.|ina)?s?\s?\d+(?:\s?[-–]\s?\d+)?|\bfls?\.\s?\d+(?: dos autos digitais)?|\b(?:Mov|Arq|Pág|Evento)\.?\s?\d+(?:[.-]\d+)?|\[P\d+\])/g;
+  const REF = /(⟦[^⟧]*⟧|\bMov(?:\.|imentação)\s?\d+\s*[,;–-]?\s*Arq(?:\.|uivo)\s?\d+\s*[,;–-]?\s*Págs?(?:\.|inas?)?\s?\d+(?:\s?[-–]\s?\d+)?|\bArq(?:\.|uivo)\s?\d+\s*[,;–-]?\s*Págs?(?:\.|inas?)?\s?\d+(?:\s?[-–]\s?\d+)?|\bfls?\.\s?\d+(?: dos autos digitais)?|\b(?:Mov|Arq|Pág|Evento)\.?\s?\d+(?:[.-]\d+)?|\[P\d+\])/g;
   function irParaPagina(n) { S.pagina = n; painel("p-autos"); renderPagina(); }
   function inlineRefs(text) {
     const out = [];
@@ -417,19 +417,126 @@
     clear($("#minuta-acts"), c.minuta ? [
       S.anterior != null ? h("button", { class: "btn quiet sm", type: "button", onclick: () => { const x = c.minuta; c.minuta = S.anterior; S.anterior = x; salvarHistorico(); render(); toast("Versão anterior restaurada."); }, text: "Desfazer" }) : null,
       h("button", { class: "btn quiet sm", type: "button", onclick: copiar, text: "Copiar" }),
-      S.cap.downloads ? h("button", { class: "btn quiet sm", type: "button", onclick: baixarWord, text: "Word" }) : null] : []);
+      h("button", { class: "btn quiet sm", type: "button", onclick: (e) => exportar(e, baixarWord), text: "Word" }),
+      h("button", { class: "btn quiet sm", type: "button", onclick: (e) => exportar(e, baixarPdf), text: "PDF" })] : []);
+  }
+  async function exportar(e, fn) {
+    const b = e.currentTarget, rot = b.textContent; b.disabled = true; b.textContent = "Gerando…";
+    try { await fn(); } catch (x) { toast("Não foi possível gerar o arquivo."); } finally { b.disabled = false; b.textContent = rot; }
   }
   const semMarcadores = (t) => textoLegado(t).replace(/\s?\[P\d+\]/g, "");
   async function copiar() {
     try { await navigator.clipboard.writeText(semMarcadores(S.caso.minuta)); toast("Minuta copiada."); }
     catch (e) { S.minAba = "editar"; renderMinuta(); $("#editor").select(); toast("Selecione e copie no editor."); }
   }
+  // ───────── Exportação: Word (.docx) e PDF, no padrão de peça forense ─────────
+  // O visualizador do claude.ai só aceita .docx/.pdf (entre outros); ".doc" era recusado e o download não acontecia.
+  // As bibliotecas vêm junto com a página e só são carregadas no primeiro clique.
+  const carregados = {};
+  function carregarScript(src, global) {
+    if (window[global]) return Promise.resolve(window[global]);
+    return carregados[src] || (carregados[src] = new Promise((ok, falha) => {
+      const s = document.createElement("script"); s.src = src;
+      s.onload = () => (window[global] ? ok(window[global]) : falha(new Error("biblioteca não carregou")));
+      s.onerror = () => { delete carregados[src]; falha(new Error("biblioteca não carregou")); };
+      document.head.append(s);
+    }));
+  }
+  /** Minuta em blocos com trechos formatados: {tipo: h1|h2|h3|p|cit|li, runs: [{t, b, i, u}]} */
+  function blocosDaMinuta(texto) {
+    const runs = (linha) => {
+      const out = [];
+      for (const p of linha.split(/(\*\*[^*]+\*\*|__[^_]+__|\*[^*\s][^*]*\*)/g)) {
+        if (!p) continue;
+        if (/^\*\*.+\*\*$/.test(p)) out.push({ t: p.slice(2, -2), b: true });
+        else if (/^__.+__$/.test(p)) out.push({ t: p.slice(2, -2), u: true });
+        else if (/^\*.+\*$/.test(p)) out.push({ t: p.slice(1, -1), i: true });
+        else out.push({ t: p });
+      }
+      return out;
+    };
+    const blocos = [];
+    for (const bloco of semMarcadores(texto).split(/\n\s*\n/)) {
+      const t = bloco.trim(); if (!t) continue;
+      const linhas = t.split("\n"), hm = /^(#{1,3})\s+(.*)$/.exec(linhas[0]);
+      if (hm) { blocos.push({ tipo: "h" + hm[1].length, runs: runs(hm[2]) }); if (linhas.length > 1) blocos.push(...blocosDaMinuta(linhas.slice(1).join("\n"))); continue; }
+      if (linhas.every((l) => /^\s*>/.test(l))) { blocos.push({ tipo: "cit", runs: runs(linhas.map((l) => l.replace(/^\s*>\s?/, "")).join(" ")) }); continue; }
+      if (linhas.every((l) => /^\s*[-*•]\s+/.test(l))) { linhas.forEach((l) => blocos.push({ tipo: "li", runs: runs("• " + l.replace(/^\s*[-*•]\s+/, "")) })); continue; }
+      blocos.push({ tipo: "p", runs: runs(linhas.join(" ")) });
+    }
+    return blocos;
+  }
+  const nomeArquivo = (ext) => `minuta-${(S.caso.numero && S.caso.numero !== "n/i" ? S.caso.numero : "processo").replace(/[^\w.-]+/g, "_")}.${ext}`;
+  async function salvar(nome, data) {
+    if (!S.cap.downloads) return toast("Download indisponível nesta visualização. Abra a página no claude.ai.");
+    try { await S.cap.downloads.save({ filename: nome, data }); }
+    catch (e) { if (e && e.code !== "declined") toast(e && e.code === "rate_limited" ? "Já há um download aguardando confirmação." : "Não foi possível salvar o arquivo (" + ((e && e.code) || "erro") + ")."); }
+  }
+
   async function baixarWord() {
-    const div = h("div"); div.append(md(semMarcadores(S.caso.minuta)));
-    div.querySelectorAll(".ref,.pid").forEach((r) => r.replaceWith(document.createTextNode(r.textContent)));
-    const nome = `minuta-${(S.caso.numero && S.caso.numero !== "n/i" ? S.caso.numero : "processo").replace(/[^\w.-]+/g, "_")}.doc`;
-    const html = `<html lang="pt-BR"><head><meta charset="utf-8"><title>Minuta</title><style>body{font:12pt/1.5 "Times New Roman",serif}h1,h2{text-align:center;text-transform:uppercase;font-size:12pt}h3{font-size:12pt}p{text-align:justify;text-indent:2cm}p.cit{text-indent:0;margin-left:4cm;font-size:11pt}</style></head><body>${div.innerHTML}</body></html>`;
-    try { await S.cap.downloads.save({ filename: nome, data: html }); } catch (e) { if (e && e.code !== "declined") toast("Não foi possível salvar o arquivo."); }
+    let D;
+    try { D = await carregarScript("docx.min.js", "docx"); } catch (e) { return toast("Não foi possível carregar o gerador de Word. Recarregue a página."); }
+    const cm = (n) => Math.round(n * 567);
+    const tr = (b, extra = {}) => b.runs.map((r) => new D.TextRun({ text: r.t, bold: r.b || extra.bold, italics: r.i || extra.italics, underline: r.u ? {} : undefined, font: "Times New Roman", size: extra.size || 24 }));
+    const paras = blocosDaMinuta(S.caso.minuta).map((b) => {
+      if (b.tipo === "h1") return new D.Paragraph({ children: tr(b, { bold: true, size: 26 }), alignment: D.AlignmentType.CENTER, spacing: { before: 0, after: 240 } });
+      if (b.tipo === "h2") return new D.Paragraph({ children: tr(b, { bold: true }), alignment: D.AlignmentType.CENTER, spacing: { before: 360, after: 240 } });
+      if (b.tipo === "h3") return new D.Paragraph({ children: tr(b, { bold: true }), alignment: D.AlignmentType.LEFT, spacing: { before: 240, after: 120 } });
+      if (b.tipo === "cit") return new D.Paragraph({ children: tr(b, { italics: true, size: 22 }), alignment: D.AlignmentType.JUSTIFIED, indent: { left: cm(4) }, spacing: { before: 120, after: 240, line: 240 } });
+      if (b.tipo === "li") return new D.Paragraph({ children: tr(b), alignment: D.AlignmentType.JUSTIFIED, indent: { left: cm(1) }, spacing: { after: 120, line: 360 } });
+      return new D.Paragraph({ children: tr(b), alignment: D.AlignmentType.JUSTIFIED, indent: { firstLine: cm(2) }, spacing: { after: 160, line: 360 } });
+    });
+    const doc = new D.Document({ creator: "Assessor TJGO", title: S.caso.numero || "Minuta",
+      sections: [{ properties: { page: { size: { width: cm(21), height: cm(29.7) }, margin: { top: cm(3), left: cm(3), right: cm(2), bottom: cm(2) } } }, children: paras }] });
+    await salvar(nomeArquivo("docx"), await D.Packer.toBlob(doc));
+  }
+
+  async function baixarPdf() {
+    let J;
+    try { J = await carregarScript("jspdf.min.js", "jspdf"); } catch (e) { return toast("Não foi possível carregar o gerador de PDF. Recarregue a página."); }
+    const pdf = new J.jsPDF({ unit: "pt", format: "a4" });
+    const W = pdf.internal.pageSize.getWidth(), H = pdf.internal.pageSize.getHeight();
+    const M = { l: 85, r: 57, t: 85, b: 70 }, larg = W - M.l - M.r;
+    // Fontes padrão do PDF (Times) cobrem o português; troca os poucos símbolos fora delas.
+    const limpa = (t) => t.replace(/[“”]/g, '"').replace(/[‘’]/g, "'").replace(/[–—]/g, "-").replace(/…/g, "...").replace(/[^\x00-\xFF§ºª°]/g, "");
+    let y = M.t;
+    const estilo = (r, extra) => ((r.b || extra.b) && (r.i || extra.i) ? "bolditalic" : (r.b || extra.b) ? "bold" : (r.i || extra.i) ? "italic" : "normal");
+    function paragrafo(runs, { size = 12, esq = 0, recuo = 0, alin = "justify", entre = 1.5, antes = 0, depois = 8, extra = {} } = {}) {
+      const palavras = [];
+      for (const r of runs) for (const w of limpa(r.t).split(/(\s+)/)) { if (!w) continue; if (/^\s+$/.test(w)) { if (palavras.length) palavras[palavras.length - 1].esp = true; continue; } palavras.push({ w, st: estilo(r, extra), esp: false }); }
+      pdf.setFontSize(size);
+      const medir = (p) => { pdf.setFont("times", p.st); return pdf.getTextWidth(p.w); };
+      const espaco = (() => { pdf.setFont("times", "normal"); return pdf.getTextWidth(" "); })();
+      const linhas = []; let atual = [], usado = 0, primeira = true;
+      for (const p of palavras) {
+        const lw = larg - esq - (primeira ? recuo : 0), pw = medir(p), sep = atual.length ? espaco : 0;
+        if (atual.length && usado + sep + pw > lw) { linhas.push({ ps: atual, usado, lw, primeira }); atual = []; usado = 0; primeira = false; }
+        usado += (atual.length ? espaco : 0) + pw; atual.push({ ...p, pw });
+      }
+      if (atual.length) linhas.push({ ps: atual, usado, lw: larg - esq - (primeira ? recuo : 0), primeira, ultima: true });
+      const lh = size * entre; y += antes;
+      linhas.forEach((ln) => {
+        if (y + lh > H - M.b) { pdf.addPage(); y = M.t; }
+        let x = M.l + esq + (ln.primeira ? recuo : 0);
+        const livre = ln.lw - ln.usado;
+        if (alin === "center") x += livre / 2;
+        const extraEsp = alin === "justify" && !ln.ultima && ln.ps.length > 1 ? livre / (ln.ps.length - 1) : 0;
+        ln.ps.forEach((p, k) => { pdf.setFont("times", p.st); pdf.text(p.w, x, y + size); x += p.pw + espaco + extraEsp; void k; });
+        y += lh;
+      });
+      y += depois;
+    }
+    for (const b of blocosDaMinuta(S.caso.minuta)) {
+      if (b.tipo === "h1") paragrafo(b.runs, { size: 13, alin: "center", extra: { b: true }, depois: 14 });
+      else if (b.tipo === "h2") paragrafo(b.runs, { alin: "center", extra: { b: true }, antes: 10, depois: 10 });
+      else if (b.tipo === "h3") paragrafo(b.runs, { alin: "left", extra: { b: true }, antes: 6, depois: 6 });
+      else if (b.tipo === "cit") paragrafo(b.runs, { size: 11, esq: 113, entre: 1.15, extra: { i: true }, antes: 4, depois: 12 });
+      else if (b.tipo === "li") paragrafo(b.runs, { esq: 28 });
+      else paragrafo(b.runs, { recuo: 57 });
+    }
+    const n = pdf.getNumberOfPages();
+    for (let i = 1; i <= n; i++) { pdf.setPage(i); pdf.setFont("times", "normal"); pdf.setFontSize(9); pdf.text(`${i}/${n}`, W - M.r, H - 30, { align: "right" }); }
+    await salvar(nomeArquivo("pdf"), pdf.output("blob"));
   }
 
   // ───────── Chat com a minuta (lê os autos por ferramentas) ─────────
