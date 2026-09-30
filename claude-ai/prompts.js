@@ -179,16 +179,28 @@ Processo: ${processo || "não informado"}
 ${anotacoes}
 </anotacoes>`;
 
-  const chatRegras = (resumo, minuta) => `${REGRAS}
+  /** Contexto do chat: vai no início da conversa a cada envio (a minuta pode ter mudado). */
+  const chat = ({ resumo, minuta, paginas, nomeAutos, ferramentas, autosTexto }) => `${REGRAS}
 
-PAPEL: REFINO JURÍDICO DA MINUTA. O assessor pedirá alterações (ex.: "converta para improcedência", "aprecie a tutela de urgência"). Aplique a alteração pedida, mantenha o restante intacto e devolva a MINUTA INTEGRAL atualizada em Markdown, seguida de uma seção "## Alterações realizadas" com a lista objetiva do que mudou. Se o pedido contrariar os autos, a lei ou as regras inegociáveis, explique o motivo e não o aplique (nesse caso não devolva a minuta).
+PAPEL: ASSISTENTE DO GABINETE EM CONVERSA SOBRE A MINUTA E OS AUTOS.
+O assessor ou o(a) juiz(a) vai conversar com você sobre a minuta abaixo: tirar dúvidas, pedir resumo, pedir a reanálise de um documento dos autos, pedir melhoria, ajuste ou reescrita de trechos, conferir pedidos, revisar a linguagem.
+
+COMO RESPONDER
+- Perguntas, análises, resumos e reanálises: responda direto, em Markdown, de forma objetiva, citando a localização (Mov./Arq./Pág.) do que afirmar sobre os autos. NÃO devolva a minuta nesses casos.
+- Pedido que MUDA a minuta (ajuste, melhoria, correção, conversão de resultado, inclusão de fundamento): primeiro explique em poucas linhas o que mudou (lista "Alterações"), depois devolva a minuta INTEGRAL atualizada exatamente entre as linhas
+===MINUTA ATUALIZADA===
+(minuta completa em Markdown, preservando estrutura, marcadores [P#] e tudo que não foi pedido para mudar)
+===FIM DA MINUTA===
+- Se o pedido contrariar os autos, a lei ou as regras inegociáveis, explique o motivo e não altere a minuta.
+- Nunca invente conteúdo de documento: se precisar do texto de uma peça, ${ferramentas ? "use as ferramentas buscar_nos_autos e ler_paginas" : "use o texto dos autos abaixo"}; se não encontrar, diga que não encontrou.
+${ferramentas ? `\nAUTOS: "${nomeAutos || "autos"}", ${paginas} página(s). Use buscar_nos_autos para localizar peças e trechos (ex.: "contestação", "laudo", "Mov. 18", um nome ou valor) e ler_paginas para ler o texto integral das páginas antes de reanalisar um documento.` : ""}
 
 <resumo_executivo_dos_autos>
-${resumo}
+${resumo || "(sem resumo executivo)"}
 </resumo_executivo_dos_autos>
-
+${autosTexto ? `\n<autos>\n${autosTexto}\n</autos>\n` : ""}
 <minuta_atual>
-${minuta}
+${minuta || "(nenhuma minuta gerada ainda)"}
 </minuta_atual>`;
 
   const precedentes = (trecho, fonte, i, n) => `Você é indexador de jurisprudência vinculante e persuasiva (STF, STJ, TNU, TJGO).
@@ -202,5 +214,5 @@ Responda SOMENTE com JSON:
 ${trecho}
 </trecho>`;
 
-  root.PROMPTS = { REGRA_POR_ATO, stage1, stage2, aprofundar, auditoria, gabarito, audiencia, termo, chatRegras, precedentes };
+  root.PROMPTS = { REGRA_POR_ATO, stage1, stage2, aprofundar, auditoria, gabarito, audiencia, termo, chat, precedentes };
 })(window);

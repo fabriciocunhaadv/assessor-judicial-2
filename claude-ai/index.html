@@ -161,6 +161,16 @@ details.reg summary { cursor: pointer; font-weight: 600; font-size: 13.5px; }
 details.reg ul { margin: 6px 0; padding-left: 18px; font-size: 13px; display: grid; gap: 3px; }
 details.reg p { margin: 6px 0; font-size: 13px; }
 
+/* Chat */
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chips button { border: 1px solid var(--line); background: var(--surface); color: var(--ink); border-radius: 999px; padding: 4px 10px; font-size: 12.5px; cursor: pointer; }
+.chips button:hover { border-color: var(--accent); color: var(--accent); }
+.msg .acts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.msg details { margin-top: 8px; border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; }
+.msg details summary { cursor: pointer; font-size: 12.5px; font-weight: 600; color: var(--accent); }
+.tool-note { font-size: 12px; color: var(--muted); font-style: italic; }
+#chat-minuta:not(:empty):not(:has(> .placeholder)) { border-left: 4px solid var(--accent); padding-left: 16px; }
+
 /* Folha da minuta */
 .folha { font: 16px/1.72 var(--f-doc); color: var(--ink); max-width: 72ch; margin: 0 auto; overflow-wrap: anywhere; }
 .folha h2 { font: 700 15px/1.4 var(--f-doc); text-transform: uppercase; letter-spacing: .06em; text-align: center; margin: 28px 0 12px; }
@@ -235,7 +245,7 @@ th:first-child, td:first-child { text-align: left; }
       <button role="tab" id="t-esteira" aria-controls="esteira" aria-selected="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg>Nova Análise</button>
       <button role="tab" id="t-lupa" aria-controls="lupa" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2"/><circle cx="12" cy="12" r="3"/><path d="m16 16-1.9-1.9"/></svg>Auditoria Ouro (Lupa)</button>
       <button role="tab" id="t-audiencia" aria-controls="audiencia" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m14 13-7.5 7.5a2.12 2.12 0 0 1-3-3L11 10"/><path d="m16 16 6-6M8 8l6-6M9 7l8 8M21 11l-8-8"/></svg>Mesa de Audiência</button>
-      <button role="tab" id="t-chat" aria-controls="chat" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>Chat &amp; Refino</button>
+      <button role="tab" id="t-chat" aria-controls="chat" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>Chat com a minuta</button>
       <button role="tab" id="t-historico" aria-controls="historico" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5M12 7v5l4 2"/></svg>Histórico</button>
       <button role="tab" id="t-agenda" aria-controls="agenda" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>Agenda</button>
       <div class="sep" aria-hidden="true"></div>
@@ -341,12 +351,24 @@ th:first-child, td:first-child { text-align: left; }
 
   <!-- CHAT -->
   <section role="tabpanel" id="chat" aria-labelledby="t-chat" hidden>
-    <div class="page-h"><h2>Chat &amp; Refino</h2><p>Peça ajustes na minuta; o Claude recebe o Resumo Executivo e a minuta atual, não os autos inteiros.</p></div>
-    <div class="panel"><header><h2>Chat de refino jurídico</h2><span class="muted small">Envia o Resumo Executivo e a minuta atual, não os autos inteiros.</span></header><div class="body">
-      <div class="msgs" id="msgs"><p class="muted small" id="chat-vazio">Gere uma minuta na Esteira. Depois peça ajustes como “converta para improcedência” ou “aprecie a tutela de urgência”.</p></div>
-      <div class="row" style="align-items:stretch"><textarea id="t-msg" rows="2" style="flex:1;min-width:0" placeholder="Pedido de alteração (Ctrl+Enter envia)"></textarea><button class="btn" id="b-enviar" type="button" disabled>Enviar</button></div>
-      <div id="chat-err"></div>
-    </div></div>
+    <div class="page-h"><h2>Chat com a minuta</h2><p>Converse com o Claude sobre a minuta e os autos: reanalisar um documento, pedir melhoria, ajuste, resumo ou explicação.</p></div>
+    <div class="grid g-side-r">
+      <div class="panel"><header><h2>Conversa</h2><div class="row"><span class="muted small" id="chat-ctx"></span><button class="btn quiet sm" id="b-chat-nova" type="button">Nova conversa</button></div></header><div class="body">
+        <div class="msgs" id="msgs"></div>
+        <div class="chips" id="chips">
+          <button type="button" data-p="Faça um resumo objetivo da minuta: resultado de cada pedido, fundamentos principais e condenações.">Resumir a minuta</button>
+          <button type="button" data-p="Reanalise nos autos o seguinte documento e diga se a minuta o considerou corretamente: " data-edit="1">Reanalisar um documento…</button>
+          <button type="button" data-p="Melhore a fundamentação da minuta: aprofunde o confronto com as provas e a subsunção, sem acrescentar fatos que não estejam nos autos.">Melhorar a fundamentação</button>
+          <button type="button" data-p="Confira se todos os pedidos de cada parte foram julgados no dispositivo e aponte o que faltar.">Conferir pedidos</button>
+          <button type="button" data-p="Revise português, clareza e coesão da minuta, sem mudar o conteúdo jurídico.">Revisar a linguagem</button>
+          <button type="button" data-p="Explique a decisão em linguagem simples, como para a parte leiga.">Explicar em linguagem simples</button>
+        </div>
+        <div class="row" style="align-items:stretch"><textarea id="t-msg" rows="3" style="flex:1;min-width:0" placeholder="Pergunte ou peça um ajuste (Ctrl+Enter envia). Ex.: reanalise o laudo pericial da Mov. 42."></textarea>
+          <div class="stack" style="gap:6px"><button class="btn" id="b-enviar" type="button" disabled>Enviar</button><button class="btn danger sm" id="b-chat-parar" type="button" hidden>Parar</button></div></div>
+        <div id="chat-err"></div>
+      </div></div>
+      <div class="panel"><header><h2 id="chat-min-h">Minuta atual</h2><div class="row" id="chat-min-acts"></div></header><div class="body scroll"><div class="folha claude-out" id="chat-minuta"></div></div></div>
+    </div>
   </section>
 
   <!-- PRECEDENTES -->

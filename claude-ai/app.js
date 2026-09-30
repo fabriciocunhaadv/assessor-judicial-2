@@ -44,6 +44,7 @@
     }
     if (id === "lupa") renderLupa();
     if (id === "agenda") renderAgenda();
+    if (id === "chat") renderChat();
     window.scrollTo(0, 0);
   }
   TABS.forEach((t) => $("#t-" + t).addEventListener("click", () => abrirAba(t)));
@@ -148,7 +149,7 @@
 
   function novoCaso(dados) {
     S.caso = { nome: "", autos: "", paginas: 0, pdf: null, exemplo: false, dossie: null, resumo: "", minuta: "", numero: "", ...dados };
-    S.diag = null; S.chat = []; S.pagina = 1;
+    S.diag = null; S.chat = []; S.pagina = 1; S.minutaAnterior = null;
     renderCaso();
   }
 
@@ -297,6 +298,7 @@
         h("button", { class: "btn quiet sm", type: "button", onclick: copiarMinuta, text: "Copiar" }),
         S.cap.downloads ? h("button", { class: "btn quiet sm", type: "button", onclick: () => baixar("html"), text: "Baixar para Word" }) : null,
         S.cap.downloads ? h("button", { class: "btn quiet sm", type: "button", onclick: () => baixar("md"), text: ".md" }) : null,
+        h("button", { class: "btn ghost sm", type: "button", onclick: () => abrirAba("chat"), text: "Conversar sobre a minuta" }),
         h("button", { class: "btn ghost sm", type: "button", onclick: () => abrirAba("lupa"), text: "Conferir na Lupa" }));
     }
 
@@ -320,6 +322,7 @@
 
     renderBotoes();
     if (!$("#lupa").hidden) renderLupa();
+    if (!$("#chat").hidden) renderMinutaChat();
   }
 
   function renderBotoes() {
@@ -328,7 +331,7 @@
     $("#b-auditar").disabled = !ok || !$("#editor").value.trim() || !(c.autos || c.resumo) || ocupado;
     $("#b-painel").disabled = !ok || !(c.resumo || c.autos);
     $("#b-termo").disabled = !ok;
-    $("#b-enviar").disabled = !ok || !c.minuta || !c.resumo;
+    $("#b-enviar").disabled = !ok || !(c.minuta || c.autos) || ocupado;
   }
 
   const semMarcadores = (t) => t.replace(/\s?\[P\d+\]/g, "");
@@ -491,36 +494,120 @@
     finally { renderBotoes(); }
   });
 
-  // ───────── Chat ─────────
+  // ───────── Chat com a minuta ─────────
+  // O Claude pode buscar e ler páginas dos autos (ferramentas da página) para reanalisar documentos.
   const tMsg = $("#t-msg");
+  const INI = "===MINUTA ATUALIZADA===", FIM = "===FIM DA MINUTA===";
   tMsg.addEventListener("keydown", (e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) enviarChat(); });
   $("#b-enviar").addEventListener("click", enviarChat);
+  $("#b-chat-parar").addEventListener("click", () => S.ctl && S.ctl.abort());
+  $("#b-chat-nova").addEventListener("click", () => { S.chat = []; renderChat(); tMsg.focus(); });
+  $("#chips").addEventListener("click", (e) => {
+    const b = e.target.closest("button[data-p]"); if (!b) return;
+    tMsg.value = b.dataset.p; tMsg.focus();
+    if (b.dataset.edit) tMsg.setSelectionRange(tMsg.value.length, tMsg.value.length);
+    else enviarChat();
+  });
+
+  function separar(texto) {
+    const i = texto.indexOf(INI);
+    if (i < 0) return { conversa: texto, minuta: "" };
+    const resto = texto.slice(i + INI.length), f = resto.indexOf(FIM);
+    return { conversa: texto.slice(0, i).trim(), minuta: (f >= 0 ? resto.slice(0, f) : resto).trim(), completa: f >= 0 };
+  }
+  function aplicarMinuta(txt) {
+    S.minutaAnterior = S.caso.minuta; S.caso.minuta = txt;
+    renderCaso(); salvarHistorico(); renderChat(); toast("Minuta atualizada. Use “Desfazer” para voltar.");
+  }
+  function renderMinutaChat() {
+    const c = S.caso;
+    $("#chat-ctx").textContent = c.autos ? `Autos: ${c.paginas} pág.` : c.minuta ? "Sem os autos (só a minuta)" : "";
+    $("#chat-min-h").textContent = c.numero && c.numero !== "n/i" ? `Minuta atual · ${c.numero}` : "Minuta atual";
+    clear($("#chat-min-acts"),
+      S.minutaAnterior != null ? h("button", { class: "btn quiet sm", type: "button", onclick: () => { const x = S.caso.minuta; S.caso.minuta = S.minutaAnterior; S.minutaAnterior = null; renderCaso(); salvarHistorico(); renderChat(); toast("Alteração desfeita."); void x; }, text: "Desfazer" }) : null,
+      c.minuta ? h("button", { class: "btn quiet sm", type: "button", onclick: copiarMinuta, text: "Copiar" }) : null);
+    clear($("#chat-minuta"), c.minuta ? md(c.minuta) : h("div", { class: "placeholder" }, h("p", { text: "Nenhuma minuta ainda. Gere uma na Nova Análise ou abra uma do Histórico. Com os autos carregados, você já pode conversar sobre eles." })));
+  }
   function renderChat(streaming) {
     const box = $("#msgs");
-    if (!S.chat.length && !streaming) return clear(box, h("p", { class: "muted small", text: "Gere uma minuta na Esteira. Depois peça ajustes como “converta para improcedência” ou “aprecie a tutela de urgência”." }));
-    clear(box, S.chat.map((m) => m.role === "user" ? h("div", { class: "msg user", text: m.content }) : h("div", { class: "msg bot" },
-      h("div", { class: "folha" }, md(m.content)),
-      /##\s*Altera/i.test(m.content) ? h("button", { class: "btn ghost sm", type: "button", onclick: () => { S.caso.minuta = m.content.replace(/\n#{1,3}\s*Altera[çc][õo]es realizadas[\s\S]*$/i, "").trim(); renderCaso(); toast("Minuta atualizada."); }, text: "Aplicar como minuta atual" }) : null)),
-      streaming || null);
+    renderMinutaChat();
+    if (!S.chat.length && !streaming) return clear(box, h("p", { class: "muted small", text: "Pergunte qualquer coisa sobre a minuta ou os autos, ou use os atalhos abaixo. Quando o Claude propuser uma minuta alterada, você decide se aplica." }));
+    clear(box, S.chat.map((m, idx) => {
+      if (m.role === "user") return h("div", { class: "msg user", text: m.content });
+      const { conversa, minuta, completa } = separar(m.content);
+      return h("div", { class: "msg bot" },
+        h("span", { class: "claude-chip", text: "Claude" }),
+        h("div", { class: "folha" }, md(conversa || (minuta ? "Minuta atualizada abaixo." : ""))),
+        m.fontes && m.fontes.length ? h("p", { class: "tool-note", text: "Consultou nos autos: " + m.fontes.join("; ") }) : null,
+        minuta ? h("details", null, h("summary", { text: completa === false ? "Minuta proposta (resposta cortada — confira antes de aplicar)" : "Ver a minuta proposta" }), h("div", { class: "folha" }, md(minuta))) : null,
+        minuta ? h("div", { class: "acts" },
+          m.aplicada ? h("span", { class: "pill ok", text: "Aplicada" }) : h("button", { class: "btn sm", type: "button", onclick: () => { m.aplicada = true; aplicarMinuta(minuta); }, text: "Aplicar como minuta atual" })) : null);
+    }), streaming || null);
     box.scrollTop = box.scrollHeight;
   }
+
+  // Ferramentas que o Claude usa para ler os autos (dados pequenos por chamada).
+  function paginasDoTexto(autos) {
+    const pags = new Map(); let atual = 1;
+    for (const p of autos.split(/(⟦Pág\. \d+⟧)/)) { const m = /⟦Pág\. (\d+)⟧/.exec(p); if (m) atual = Number(m[1]); else pags.set(atual, (pags.get(atual) || "") + p); }
+    return pags;
+  }
+  function ferramentasAutos(fontes, nota) {
+    const c = S.caso, pags = paginasDoTexto(c.autos);
+    return [
+      { name: "buscar_nos_autos", description: "Procura um termo nos autos (nome de peça, pessoa, valor, 'Mov. 18', 'laudo'...). Retorna até 12 ocorrências com a página e um trecho. Use antes de ler páginas.",
+        inputSchema: { type: "object", properties: { termo: { type: "string", description: "Texto a procurar (mín. 3 letras)" } }, required: ["termo"] },
+        execute: ({ termo }) => {
+          const q = String(termo || "").trim(); if (q.length < 3) throw new Error("Informe ao menos 3 letras.");
+          nota(`buscando “${q}”…`);
+          const re = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi"), out = [];
+          for (const [n, t] of pags) { let m; re.lastIndex = 0; while ((m = re.exec(t)) && out.length < 12) out.push({ pagina: n, trecho: t.slice(Math.max(0, m.index - 160), m.index + q.length + 200).replace(/\s+/g, " ").trim() }); if (out.length >= 12) break; }
+          fontes.push(`busca “${q}”`);
+          return out.length ? out : "Nada encontrado. Tente outro termo.";
+        } },
+      { name: "ler_paginas", description: "Lê o texto integral de páginas dos autos (até 6 páginas por vez). Retorna a lista {pagina, texto}. Use para reanalisar um documento.",
+        inputSchema: { type: "object", properties: { inicio: { type: "integer", minimum: 1 }, fim: { type: "integer", minimum: 1 } }, required: ["inicio"] },
+        execute: ({ inicio, fim }) => {
+          const a = Math.max(1, Math.floor(Number(inicio) || 1)), b = Math.min(c.paginas || a, Math.max(a, Math.floor(Number(fim) || a)), a + 5);
+          nota(`lendo pág. ${a}${b > a ? "–" + b : ""}…`);
+          const out = []; let total = 0;
+          for (let n = a; n <= b; n++) { const t = (pags.get(n) || "").trim().slice(0, 30000 - total); total += t.length; out.push({ pagina: n, texto: t || "(página sem texto)" }); if (total >= 30000) break; }
+          fontes.push(`pág. ${a}${b > a ? "–" + b : ""}`);
+          return out;
+        } },
+    ];
+  }
+
   async function enviarChat() {
-    const msg = tMsg.value.trim();
+    const msg = tMsg.value.trim(), c = S.caso;
     if (!msg || $("#b-enviar").disabled) return;
     showErr($("#chat-err"), null);
     S.chat.push({ role: "user", content: msg }); tMsg.value = "";
-    const bolha = h("div", { class: "msg bot" }, h("p", { class: "muted small", text: "Pensando…" }));
+    const bolha = h("div", { class: "msg bot" }, h("span", { class: "claude-chip", text: "Claude" }), h("p", { class: "muted small", text: "Pensando…" }));
     renderChat(bolha);
-    $("#b-enviar").disabled = true;
-    // A minuta atual já carrega o estado; respostas antigas vão resumidas para caber na chamada.
-    const hist = S.chat.slice(-6).map((m) => (m.role === "assistant" && m.content.length > 3000 ? { role: "assistant", content: m.content.slice(0, 3000) + "\n[…resposta anterior abreviada; a minuta atual acima já reflete as alterações aceitas]" } : m));
-    const turns = [{ role: "user", content: P.chatRegras(S.caso.resumo, S.caso.minuta) }, ...hist];
+    S.ctl = new AbortController(); renderBotoes(); $("#b-chat-parar").hidden = false;
+    const fontes = [], nota = (t) => { const n = bolha.querySelector(".tool-note") || bolha.appendChild(h("p", { class: "tool-note" })); n.textContent = "Consultando os autos: " + t; };
+    const usarFerramentas = !!(c.autos && S.cap.tools);
+    // Sem ferramentas, os autos vão no texto quando cabem; senão, o resumo.
+    const autosTexto = !usarFerramentas && c.autos ? autosParaIA(c.minuta, c.resumo) : "";
+    const contexto = P.chat({ resumo: (c.resumo || "").slice(0, 60000), minuta: c.minuta, paginas: c.paginas, nomeAutos: c.nome, ferramentas: usarFerramentas, autosTexto: autosTexto === c.resumo ? "" : autosTexto });
+    // Histórico curto; respostas antigas com minuta vão abreviadas (a minuta atual já está no contexto).
+    let hist = S.chat.slice(-8).map((m) => ({ role: m.role, content: m.role === "assistant" ? (separar(m.content).conversa || "Propus uma minuta atualizada.").slice(0, 3000) : m.content }));
+    while (hist.length && hist[0].role !== "user") hist.shift();
+    hist[0] = { role: "user", content: contexto + "\n\n---\nMENSAGEM:\n" + hist[0].content };
+    const opts = { tier: "default", cache: false, signal: S.ctl.signal, onText: ({ text }) => { const { conversa, minuta } = separar(text); clear(bolha, h("span", { class: "claude-chip", text: "Claude" }), h("div", { class: "folha" }, md(conversa)), minuta ? h("p", { class: "muted small", text: "Redigindo a minuta atualizada…" }) : null); } };
     try {
-      const r = await ask(turns, { tier: "default", cache: false, onText: ({ text }) => clear(bolha, h("div", { class: "folha" }, md(text))) });
-      S.chat.push({ role: "assistant", content: r.text });
+      let r;
+      if (usarFerramentas) {
+        const { cache, ...semCache } = opts;
+        r = await S.cap.sample(hist, { modelTier: "default", signal: semCache.signal, onText: semCache.onText, tools: ferramentasAutos(fontes, nota) });
+      } else r = await ask(hist, opts);
+      S.chat.push({ role: "assistant", content: r.text, fontes });
       renderChat();
-    } catch (e) { S.chat.pop(); tMsg.value = msg; renderChat(); showErr($("#chat-err"), e); }
-    finally { renderBotoes(); }
+    } catch (e) {
+      if (e && e.code === "cancelled") { S.chat.push({ role: "assistant", content: (e.text || "") + "\n\n*(interrompido)*", fontes }); renderChat(); }
+      else { S.chat.pop(); tMsg.value = msg; renderChat(); showErr($("#chat-err"), e); }
+    } finally { S.ctl = null; $("#b-chat-parar").hidden = true; renderBotoes(); }
   }
 
   // ───────── Precedentes ─────────
@@ -983,7 +1070,7 @@
     ["Nova Análise", "Envie os autos em PDF, escolha o prompt da área e o tipo de ato. A Etapa 1 extrai cronologia, pedidos de cada litisconsorte e provas com Mov./Arq./Pág.; a Etapa 2 redige a minuta. A conferência aponta pedidos não julgados e dados que não aparecem nos autos."],
     ["Auditoria Ouro (Lupa)", "Confira a minuta contra os autos antes da assinatura: extra, ultra e citra petita, alucinações, precedentes e consectários, com minuta gabarito. Cada auditoria fica em Processos auditados."],
     ["Mesa de Audiência", "Os 5 pilares da lide, perguntas sugeridas e o redator de termo ou de homologação de acordo."],
-    ["Chat & Refino", "Peça ajustes na minuta; o Claude recebe o Resumo Executivo e a minuta atual."],
+    ["Chat com a minuta", "Converse com o Claude sobre a minuta e os autos: resumo, reanálise de um documento (ele busca e lê as páginas dos autos), melhoria, ajuste, conferência de pedidos e revisão da linguagem. Minutas propostas só mudam quando você clica em Aplicar, e dá para desfazer."],
     ["Agenda", "Prazos, audiências e diligências do gabinete, com a calculadora de prazos em dias úteis do CPC."],
     ["Teses & Modelos", "Minutas Paradigma (⚡ Injetar no Prompt), Caderno de Teses em texto corrido e teses avulsas."],
     ["Súmulas & Precedentes", "Importe PDFs de informativos; os julgados pertinentes entram automaticamente nas minutas."],
@@ -993,6 +1080,7 @@
     ["Equipe & Lotações", "Unidades judiciárias, aviso à equipe e permissões. A equipe entra pelo botão Compartilhar do claude.ai."],
   ];
   const NOVIDADES = [
+    ["30/09/2026", "Chat com a minuta: conversa livre sobre a minuta e os autos, com atalhos (resumir, reanalisar documento, melhorar, conferir pedidos, revisar linguagem), leitura das páginas dos autos pelo Claude, aplicar e desfazer."],
     ["30/09/2026", "Todos os módulos do sistema nesta página: Agenda com prazos do CPC, Prompts por Área, Legislação & Juros, Guia do PROJUDI, Equipe & Lotações, Caderno de Teses em texto, tipo de ato, processos auditados e este Manual."],
     ["30/09/2026", "Layout igual ao do sistema principal e cores do Claude."],
     ["29/09/2026", "Primeira versão no claude.ai: minutas em 2 etapas, Lupa, audiência, chat, precedentes e histórico."],
@@ -1013,6 +1101,7 @@
     }
     const [sample, db, user, downloads] = await Promise.all(["sample", "db", "user", "downloads"].map((n) => window.claude.use(n).catch(() => null)));
     S.cap.sample = sample; S.cap.db = db; S.cap.user = user; S.cap.downloads = downloads;
+    if (sample && sample.limits) { try { S.cap.tools = !!(await sample.limits()).tools; } catch (e) { S.cap.tools = false; } }
     pill("#st-claude", sample ? "Claude: disponível" : "Claude: indisponível nesta visualização", sample ? "ok" : "bad");
 
     if (user) {
