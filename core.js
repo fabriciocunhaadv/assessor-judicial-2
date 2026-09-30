@@ -259,6 +259,22 @@
     }
     return [...out.values()];
   }
+  /** Resposta JSON cortada pelo limite: recupera os objetos completos de "itens" já escritos. */
+  function itensParciais(texto) {
+    const t = String(texto || ""), ini = t.search(/"itens"\s*:\s*\[/);
+    if (ini < 0) return [];
+    const out = [];
+    let i = t.indexOf("[", ini) + 1, prof = 0, comeco = -1, str = false, esc = false;
+    for (; i < t.length; i++) {
+      const c = t[i];
+      if (str) { if (esc) esc = false; else if (c === "\\") esc = true; else if (c === '"') str = false; continue; }
+      if (c === '"') str = true;
+      else if (c === "{") { if (prof++ === 0) comeco = i; }
+      else if (c === "}" && prof > 0 && --prof === 0) { try { out.push(JSON.parse(t.slice(comeco, i + 1))); } catch (e) { /* objeto malformado: ignora */ } }
+      else if (c === "]" && prof === 0) break;
+    }
+    return out;
+  }
   /** Mesma tese já cadastrada? Súmula/tema: mesmo número e tribunal. Demais: mesmo começo de texto. */
   function mesmaTese(a, b) {
     const ka = chaveTese(a.tipo, a.numero), kb = chaveTese(b.tipo, b.numero);
@@ -354,5 +370,5 @@
     return { inicioContagem, vencimento: isoD(d), diasCorridos: Math.round((d - parseData(intimacao)) / 86400000), ignorados };
   }
 
-  root.AJ = { cleanPages, isNoiseLine, verificarFidelidade, paragrafosDensos, secao, normalizarDossie, mergeDossies, resumoExecutivo, pedidosNaoApreciados, chunkText, bytes, hashId, normalizarPrecedente, rankPrecedentes, parseSeries, calcularConsectarios, loc, calcularPrazo, detectarLocais, chaveTese, citacoesDeTeses, selecionarTeses, mesmaTese };
+  root.AJ = { cleanPages, isNoiseLine, verificarFidelidade, paragrafosDensos, secao, normalizarDossie, mergeDossies, resumoExecutivo, pedidosNaoApreciados, chunkText, bytes, hashId, normalizarPrecedente, rankPrecedentes, parseSeries, calcularConsectarios, loc, calcularPrazo, detectarLocais, chaveTese, citacoesDeTeses, selecionarTeses, mesmaTese, itensParciais };
 })(typeof window !== "undefined" ? window : globalThis);

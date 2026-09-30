@@ -43,5 +43,6 @@ t("teses: tudo que cabe, filtrado pela área", AJ.selecionarTeses(banco, "", { a
 t("teses: sem caber, ranqueia pelo caso", AJ.selecionarTeses(banco, "contrato com banco e consumidor", { maxBytes: 450 }).map((x) => x.numero).join() === "Fixação,297");
 t("mesma tese", AJ.mesmaTese({ tipo: "Súmula", numero: "297", fonte: "STJ" }, { tipo: "Súmula", numero: "297", fonte: "stj" }) && !AJ.mesmaTese({ tipo: "Súmula", numero: "297", fonte: "STJ" }, { tipo: "Súmula", numero: "297", fonte: "STF" })
   && AJ.mesmaTese({ tipo: "Informativo", numero: "726", texto: "Na autolavagem não ocorre a consunção entre a corrupção passiva e a lavagem." }, { tipo: "Informativo", numero: "726", texto: "Na autolavagem, não ocorre a consunção entre a corrupção passiva e a lavagem!" }));
+t("itens de JSON cortado", AJ.itensParciais('{"itens":[{"tipo":"Súmula","texto":"a } \\" b"},{"tipo":"Tema","texto":"x"},{"tipo":"Súm').map((x) => x.tipo).join() === "Súmula,Tema");
 console.log(`${ok} ok, ${fail} falhas`);
 if (fail) process.exit(1);
