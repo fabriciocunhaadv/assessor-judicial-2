@@ -149,7 +149,7 @@
 
   function novoCaso(dados) {
     S.caso = { nome: "", autos: "", paginas: 0, pdf: null, exemplo: false, dossie: null, resumo: "", minuta: "", numero: "", ...dados };
-    S.diag = null; S.chat = []; S.pagina = 1; S.minutaAnterior = null;
+    S.diag = null; S.chat = []; S.pagina = 1; S.minutaAnterior = null; resAba = "minuta"; cmp = { a: null, b: null };
     renderCaso();
   }
 
@@ -242,6 +242,12 @@
       const out = $("#minuta");
       const r = await ask(prompt, { tier: "complex", signal, onText: ({ text }) => { setStep(2, "run", "redigindo"); clear(out, md(text)); } });
       c.minuta = r.text.trim();
+      c.fato = null; c.conf = c.conf || null;
+      c.meta = { tipoAto: { sentenca: "Sentença", decisao: "Decisão", despacho: "Despacho", embargos: "Embargos" }[c.tipoAto] + (S.tipoAto === "auto" ? " (auto-detectado)" : ""),
+        prompt: promptArea ? `${promptArea.titulo} · ${promptArea.area}` : "", unidade: unidade ? `${unidade.nome} — ${unidade.comarca}` : "",
+        paradigma: paradigma ? paradigma.titulo : "", caderno: !!(usarCaderno && S.cfg.caderno && S.cfg.caderno.texto), teses: teses.length,
+        conhecimento: 0, precedentes: precedentes.map((p) => `${p.tribunal} ${p.identificador}`), blocos: AJ.chunkText(c.autos, STAGE1_CHARS).length, instrucao: $("#t-instrucao").value.trim() };
+      pushVersao("Minuta gerada");
       setStep(2, "done", r.truncated ? "resposta cortada pelo limite" : "");
 
       etapa = 3; setStep(3, "run");
@@ -263,7 +269,7 @@
     const btn = $("#b-aprof"); if (btn) { btn.disabled = true; btn.textContent = "Aprofundando…"; }
     try {
       const r = await ask(P.aprofundar(c.minuta, c.resumo), { tier: "complex", signal: S.ctl.signal, onText: ({ text }) => clear($("#minuta"), md(text)) });
-      c.minuta = r.text.trim(); renderCaso(); salvarHistorico();
+      c.minuta = r.text.trim(); pushVersao("Fundamentação aprofundada"); renderCaso(); salvarHistorico();
     } catch (e) { showErr($("#gerar-err"), e); renderCaso(); }
     finally { S.ctl = null; }
   }
@@ -320,6 +326,8 @@
       clear($("#check-actions"), piso && densos < piso && c.resumo ? h("button", { class: "btn quiet sm", id: "b-aprof", type: "button", onclick: aprofundar, text: "Aprofundar fundamentação" }) : null);
     } else pc.hidden = true;
 
+    if (c.minuta && S.cap.canEdit) acts.append(h("button", { class: "btn quiet sm", type: "button", title: "Selecione um trecho da minuta e clique", onclick: selecaoParaCaderno, text: "⚡ Seleção → Caderno" }));
+    renderRes(); renderPassos();
     renderBotoes();
     if (!$("#lupa").hidden) renderLupa();
     if (!$("#chat").hidden) renderMinutaChat();
@@ -358,7 +366,7 @@
 
   // ───────── Lupa ─────────
   $("#editor").addEventListener("input", () => { S.caso.minuta = $("#editor").value; renderBotoes(); });
-  $("#editor").addEventListener("change", () => renderCaso());
+  $("#editor").addEventListener("change", () => { pushVersao("Edição manual"); renderCaso(); });
   $("#pg-prev").addEventListener("click", () => { S.pagina = Math.max(1, S.pagina - 1); renderPagina(); });
   $("#pg-next").addEventListener("click", () => { S.pagina = Math.min(S.caso.paginas || 1, S.pagina + 1); renderPagina(); });
   let buscaT;
@@ -461,7 +469,7 @@
     try {
       const r = await ask(P.gabarito(S.caso.minuta, autosParaIA(S.caso.minuta, S.diag), S.diag), { tier: "complex", signal: S.ctl.signal, onText: ({ text }) => clear(box, h("div", { class: "folha" }, md(text))) });
       const txt = r.text.trim();
-      clear(box, h("div", { class: "row" }, h("button", { class: "btn ghost sm", type: "button", onclick: () => { S.caso.minuta = txt; renderCaso(); toast("Minuta substituída pelo gabarito."); }, text: "Usar o gabarito como minuta" })), h("div", { class: "folha" }, md(txt)));
+      clear(box, h("div", { class: "row" }, h("button", { class: "btn ghost sm", type: "button", onclick: () => { S.caso.minuta = txt; pushVersao("Gabarito da Lupa"); renderCaso(); toast("Minuta substituída pelo gabarito."); }, text: "Usar o gabarito como minuta" })), h("div", { class: "folha" }, md(txt)));
     } catch (e) { showErr(box, e); btn.disabled = false; }
     finally { S.ctl = null; }
   }
@@ -516,7 +524,7 @@
     return { conversa: texto.slice(0, i).trim(), minuta: (f >= 0 ? resto.slice(0, f) : resto).trim(), completa: f >= 0 };
   }
   function aplicarMinuta(txt) {
-    S.minutaAnterior = S.caso.minuta; S.caso.minuta = txt;
+    S.minutaAnterior = S.caso.minuta; S.caso.minuta = txt; pushVersao("Ajuste pelo chat");
     renderCaso(); salvarHistorico(); renderChat(); toast("Minuta atualizada. Use “Desfazer” para voltar.");
   }
   function renderMinutaChat() {
@@ -785,6 +793,137 @@
     abrirAba("esteira");
   }
 
+  // ───────── Modo Simplificado / Avançado e guia rápido ─────────
+  function aplicarModo(m) {
+    document.body.classList.toggle("simples", m === "simples");
+    $("#seg-modo").querySelectorAll("button").forEach((b) => b.setAttribute("aria-checked", String(b.dataset.v === m)));
+    lembrar("aj.modo", m);
+  }
+  $("#seg-modo").addEventListener("click", (e) => { const b = e.target.closest("button[data-v]"); if (b) aplicarModo(b.dataset.v); });
+  try { aplicarModo(localStorage.getItem("aj.modo") || "simples"); } catch (e) { aplicarModo("simples"); }
+  function guiaRecolhida(v) {
+    $("#passos").hidden = v; $("#b-guia-fechar").textContent = v ? "Mostrar" : "Recolher";
+    lembrar("aj.guia", v ? "1" : "");
+  }
+  $("#b-guia-fechar").addEventListener("click", () => guiaRecolhida(!$("#passos").hidden));
+  try { guiaRecolhida(localStorage.getItem("aj.guia") === "1"); } catch (e) { /* */ }
+  function renderPassos() {
+    const c = S.caso, feito = { 1: !!c.autos, 2: !!c.autos && (!!S.promptId || S.tipoAto !== "auto"), 3: !!S.paradigmaId, 4: !!c.minuta };
+    $("#passos").querySelectorAll("li").forEach((li) => li.classList.toggle("feito", !!feito[li.dataset.p]));
+  }
+
+  // ───────── Versões da minuta ─────────
+  function pushVersao(origem) {
+    const c = S.caso; if (!c.minuta) return;
+    const v = c.versoes || (c.versoes = []);
+    if (v.length && v[v.length - 1].texto === c.minuta) return;
+    v.push({ em: Date.now(), origem, texto: c.minuta });
+    if (v.length > 20) v.shift();
+  }
+
+  // ───────── Abas do resultado ─────────
+  let resAba = "minuta", cmp = { a: null, b: null };
+  $("#res-tabs").addEventListener("click", (e) => { const b = e.target.closest("button[data-v]"); if (!b) return; resAba = b.dataset.v; renderRes(); });
+  const L = (v) => (Array.isArray(v) ? v : []);
+  function renderRes() {
+    const c = S.caso, view = $("#res-view");
+    $("#res-tabs").querySelectorAll("button").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.v === resAba)));
+    $("#n-versoes").textContent = c.versoes && c.versoes.length ? `(${c.versoes.length})` : "";
+    $("#minuta").hidden = resAba !== "minuta"; view.hidden = resAba === "minuta";
+    if (resAba === "minuta") return;
+    const vazio = (t) => clear(view, h("p", { class: "muted small", text: t }));
+    if (resAba === "linha") {
+      const cr = c.dossie ? L(c.dossie.cronologia) : [];
+      if (!cr.length) return vazio("A linha do tempo aparece depois da Etapa 1 (gere a minuta).");
+      return clear(view, h("ol", { class: "tl" }, cr.map((e) => h("li", null,
+        h("strong", { text: `${e.data || "s/d"} · ${String(e.tipo || "").replace(/_/g, " ")}` }), " ", h("span", { class: "ref", text: AJ.loc ? AJ.loc(e) : [e.mov && "Mov. " + e.mov, e.arq && "Arq. " + e.arq, e.pag && "Pág. " + e.pag].filter(Boolean).join(", ") }),
+        h("p", { style: "margin:2px 0 0", text: e.resumo || "" }),
+        L(e.transcricoes).filter(Boolean).map((q) => h("p", { class: "q", text: `“${q}”` }))))));
+    }
+    if (resAba === "fato") {
+      if (!c.dossie || !c.minuta) return vazio("Gere a minuta para montar a matriz de confronto Fato × Prova.");
+      const btn = h("button", { class: "btn sm", type: "button", disabled: !S.cap.sample || !!S.ctl, text: c.fato ? "Montar de novo" : "Montar matriz Fato × Prova", onclick: async () => {
+        btn.disabled = true; btn.textContent = "Montando…";
+        try { const d = await ask(P.fatoProva(c.dossie, c.minuta), { tier: "default", json: true }); c.fato = L(d && d.itens); renderRes(); }
+        catch (e) { showErr(err, e); btn.disabled = false; btn.textContent = "Tentar de novo"; } } });
+      const err = h("div");
+      return clear(view, h("div", { class: "row" }, btn, h("span", { class: "muted small", text: "Cada fato relevante com a prova, a análise, o fundamento e o impacto no julgamento." })), err,
+        c.fato ? h("div", { class: "items", style: "margin-top:10px" }, c.fato.map((i) => h("div", { class: "item" },
+          h("strong", { text: i.fato }),
+          h("p", { class: "small" }, h("strong", { text: "Prova: " }), i.prova || "—", i.localizacao ? [" ", h("span", { class: "ref", text: i.localizacao })] : null),
+          i.analise ? h("p", { class: "small" }, h("strong", { text: "Análise: " }), i.analise) : null,
+          i.fundamento ? h("p", { class: "small" }, h("strong", { text: "Fundamento: " }), i.fundamento) : null,
+          i.valoracao ? h("p", { class: "small" }, h("strong", { text: "Valoração: " }), i.valoracao) : null))) : null);
+    }
+    if (resAba === "conf") {
+      if (!c.autos && !c.resumo) return vazio("Carregue os autos para conferir competência, alçada, legitimidade, documentos e consectários.");
+      const err = h("div");
+      const btn = h("button", { class: "btn sm", type: "button", disabled: !S.cap.sample || !!S.ctl, text: c.conf ? "Conferir de novo" : "Conferir conformidade", onclick: async () => {
+        btn.disabled = true; btn.textContent = "Conferindo…";
+        try { const d = await ask(P.conformidade(autosParaIA(c.dossie), c.dossie), { tier: "default", json: true }); c.conf = { itens: L(d && d.itens), sintese: (d && d.sintese) || "" }; renderRes(); }
+        catch (e) { showErr(err, e); btn.disabled = false; btn.textContent = "Tentar de novo"; } } });
+      const ST = { ok: "✓ regular", alerta: "! conferir", falha: "✗ irregular", nao_aplicavel: "— não se aplica" };
+      const grupos = c.conf ? [...new Set(c.conf.itens.map((i) => i.grupo || "Geral"))] : [];
+      return clear(view, h("div", { class: "row" }, btn, h("span", { class: "muted small", text: "Alertas e pontos críticos do processo antes de decidir." })), err,
+        c.conf && c.conf.sintese ? h("div", { class: "info", style: "margin-top:10px", text: c.conf.sintese }) : null,
+        grupos.map((g) => h("div", { class: "sec", style: "margin-top:12px" }, h("h3", { text: g }),
+          h("div", { class: "checks" }, c.conf.itens.filter((i) => (i.grupo || "Geral") === g).map((i) => h("div", { class: "item" },
+            h("div", { class: "row" }, h("strong", { class: "small", text: i.requisito }), h("span", { class: "small st-" + i.status, text: ST[i.status] || i.status })),
+            i.observacao ? h("p", { class: "small muted", text: i.observacao + (i.localizacao ? ` (${i.localizacao})` : "") }) : null))))));
+    }
+    if (resAba === "raiox") {
+      const m = c.meta;
+      if (!m) return vazio("O Raio-X mostra o que o Claude usou para redigir: aparece depois de gerar a minuta.");
+      const { densos, nao, sem } = conferencia();
+      const linha = (rot, val) => h("div", { class: "check" }, h("span", { text: rot }), h("strong", { class: "small", text: val }));
+      return clear(view, h("div", { class: "checks" },
+        linha("Motor", "Claude (sua conta do claude.ai)"),
+        linha("Autos", `${c.paginas} página(s), ${c.autos.length.toLocaleString("pt-BR")} caracteres${m.blocos > 1 ? `, lidos em ${m.blocos} blocos` : ""}`),
+        linha("Tipo de ato", m.tipoAto), linha("Prompt da área", m.prompt || "Padrão do sistema"),
+        linha("Unidade", m.unidade || "—"), linha("Minuta Paradigma (espelho)", m.paradigma || "sem paradigma"),
+        linha("Caderno de Teses", m.caderno ? "aplicado" : "não aplicado"), linha("Teses avulsas aplicadas", String(m.teses)),
+        linha("Base de Conhecimento", m.conhecimento ? `${m.conhecimento} documento(s)` : "nenhum"),
+        linha("Precedentes injetados", m.precedentes.length ? String(m.precedentes.length) : "nenhum"),
+        linha("Pedidos no dossiê", String(c.dossie ? c.dossie.pedidos.length : 0)),
+        linha("Pedidos não apreciados", String(nao.length)), linha("Dados sem lastro nos autos", String(sem.length)), linha("Parágrafos densos", String(densos))),
+        m.precedentes.length ? h("div", { class: "sec", style: "margin-top:10px" }, h("h3", { text: "Precedentes enviados ao Claude" }), h("ul", { class: "list-ol" }, m.precedentes.map((p) => h("li", { class: "small", text: p })))) : null,
+        m.instrucao ? h("div", { class: "sec", style: "margin-top:10px" }, h("h3", { text: "Orientação do co-piloto" }), h("p", { class: "small", text: m.instrucao })) : null);
+    }
+    if (resAba === "versoes") {
+      const v = c.versoes || [];
+      if (!v.length) return vazio("Cada minuta gerada, aprofundada, ajustada pelo chat ou editada fica guardada aqui nesta sessão.");
+      if (cmp.a == null || cmp.a >= v.length) cmp.a = Math.max(0, v.length - 2);
+      if (cmp.b == null || cmp.b >= v.length) cmp.b = v.length - 1;
+      const rot = (x, i) => `v${i + 1} · ${x.origem} · ${new Date(x.em).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`;
+      const sel = (k) => { const e = h("select", { onchange: (ev) => { cmp[k] = Number(ev.target.value); renderRes(); } }, v.map((x, i) => h("option", { value: String(i), text: rot(x, i) }))); e.value = String(cmp[k]); return e; };
+      const pars = (t) => t.split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
+      const A = pars(v[cmp.a].texto), B = pars(v[cmp.b].texto), sa = new Set(A), sb = new Set(B);
+      const itens = v.map((x, i) => {
+        const restaurar = x.texto === c.minuta ? null : h("button", { class: "btn sm ghost", type: "button", text: "Restaurar",
+          onclick: () => { c.minuta = x.texto; pushVersao(`Restaurada (v${i + 1})`); renderCaso(); toast("Versão restaurada."); } });
+        return h("div", { class: "item" }, h("div", { class: "row" }, h("span", { class: "small", text: rot(x, i) + (x.texto === c.minuta ? " · atual" : "") }), restaurar));
+      }).reverse();
+      let comparar = null;
+      if (v.length > 1) {
+        const colA = h("div", { class: "col" }, A.map((p) => h("p", { class: sb.has(p) ? "" : "del", text: p })));
+        const colB = h("div", { class: "col" }, B.map((p) => h("p", { class: sa.has(p) ? "" : "add", text: p })));
+        comparar = h("div", { class: "sec", style: "margin-top:14px" }, h("h3", { text: "Comparar lado a lado" }),
+          h("div", { class: "grid g-2" }, sel("a"), sel("b")),
+          h("p", { class: "small muted", text: `${A.filter((p) => !sb.has(p)).length} parágrafo(s) só na esquerda (vermelho) · ${B.filter((p) => !sa.has(p)).length} só na direita (verde)` }),
+          h("div", { class: "cmp" }, colA, colB));
+      }
+      return clear(view, h("div", { class: "items" }, itens), comparar);
+    }
+  }
+
+  // Trecho selecionado da minuta → Caderno de Teses (só Juiz(a)/Editor).
+  async function selecaoParaCaderno() {
+    const sel = String(window.getSelection ? window.getSelection() : "").trim();
+    if (sel.length < 20) return toast("Selecione na minuta o trecho (ao menos uma frase) e clique de novo.");
+    const atual = (S.cfg.caderno && S.cfg.caderno.texto) || "";
+    if (await setCfg("caderno", { texto: (atual ? atual.trimEnd() + "\n\n" : "") + sel.slice(0, 8000) })) toast("Trecho injetado no Caderno de Teses.");
+  }
+
   // ───────── Gravação genérica no banco do gabinete ─────────
   // Sem db (fora do claude.ai), guarda só nesta sessão para a página continuar utilizável.
   async function gravar(col, id, dados, local) {
@@ -831,6 +970,7 @@
     const b = e.target.closest("button[data-v]"); if (!b) return;
     S.tipoAto = b.dataset.v;
     $("#seg-ato").querySelectorAll("button").forEach((x) => x.setAttribute("aria-checked", String(x === b)));
+    renderPassos();
   });
 
   function renderCfg() {

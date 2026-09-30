@@ -171,6 +171,32 @@ details.reg p { margin: 6px 0; font-size: 13px; }
 .tool-note { font-size: 12px; color: var(--muted); font-style: italic; }
 #chat-minuta:not(:empty):not(:has(> .placeholder)) { border-left: 4px solid var(--accent); padding-left: 16px; }
 
+.claude-chip { display: inline-flex; align-items: center; gap: 4px; padding: 1px 8px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); font-size: 11px; font-weight: 700; }
+.claude-chip::before { content: "✦"; }
+/* Resultado da Nova Análise */
+.subtabs { display: flex; gap: 2px; overflow-x: auto; padding: 0 12px; border-bottom: 1px solid var(--line); }
+.subtabs button { flex: none; border: 0; background: none; padding: 9px 10px; font-size: 12.5px; font-weight: 500; color: var(--muted); border-bottom: 2px solid transparent; cursor: pointer; white-space: nowrap; }
+.subtabs button[aria-selected="true"] { color: var(--accent); border-bottom-color: var(--accent); }
+.tl { list-style: none; margin: 0; padding: 0 0 0 14px; border-left: 2px solid var(--line); display: grid; gap: 12px; }
+.tl li { position: relative; font-size: 13.5px; }
+.tl li::before { content: ""; position: absolute; left: -20px; top: 5px; width: 10px; height: 10px; border-radius: 50%; background: var(--btn); }
+.tl .q { font-family: var(--f-doc); font-style: italic; color: var(--muted); margin: 4px 0 0; }
+.cmp { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
+@media (max-width: 860px) { .cmp { grid-template-columns: minmax(0, 1fr); } }
+.cmp .col { border: 1px solid var(--line); border-radius: 8px; padding: 10px; font: 13.5px/1.6 var(--f-doc); max-height: 60vh; overflow: auto; }
+.cmp p { margin: 0 0 8px; padding: 2px 4px; border-radius: 4px; }
+.cmp p.del { background: var(--bad-soft); } .cmp p.add { background: var(--ok-soft); }
+.st-ok { color: var(--ok); } .st-alerta { color: var(--warn); } .st-falha { color: var(--bad); } .st-nao_aplicavel { color: var(--muted); }
+.guia-rapida { margin-bottom: 16px; }
+.passos { list-style: none; margin: 0; padding: 12px 16px; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; counter-reset: p; }
+@media (max-width: 1100px) { .passos { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .passos { grid-template-columns: minmax(0, 1fr); } }
+.passos li { display: grid; gap: 2px; padding-left: 32px; position: relative; font-size: 12.5px; color: var(--muted); counter-increment: p; }
+.passos li strong { color: var(--ink); font-size: 13px; }
+.passos li::before { content: counter(p); position: absolute; left: 0; top: 0; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; background: var(--accent-soft); color: var(--accent); font-weight: 700; font-size: 12px; }
+.passos li.feito::before { content: "✓"; background: var(--ok-soft); color: var(--ok); }
+body.simples .avancado { display: none !important; }
+
 /* Folha da minuta */
 .folha { font: 16px/1.72 var(--f-doc); color: var(--ink); max-width: 72ch; margin: 0 auto; overflow-wrap: anywhere; }
 .folha h2 { font: 700 15px/1.4 var(--f-doc); text-transform: uppercase; letter-spacing: .06em; text-align: center; margin: 28px 0 12px; }
@@ -266,7 +292,15 @@ th:first-child, td:first-child { text-align: left; }
   <div class="aviso" id="aviso" role="status" hidden><strong>Aviso do gabinete:</strong> <span id="aviso-t"></span></div>
   <!-- ESTEIRA -->
   <section role="tabpanel" id="esteira" aria-labelledby="t-esteira">
-    <div class="page-h"><h2>Nova análise</h2><p>Autos em PDF → Etapa 1 (Assessor Fático) → Etapa 2 (Juiz Revisor) → conferência automática.</p></div>
+    <div class="page-h row" style="justify-content:space-between"><div><h2>Nova análise</h2><p>Autos em PDF → Etapa 1 (Assessor Fático) → Etapa 2 (Juiz Revisor) → conferência automática.</p></div>
+      <div class="seg" id="seg-modo" role="radiogroup" aria-label="Modo"><button type="button" role="radio" data-v="simples" aria-checked="true">Modo Simplificado</button><button type="button" role="radio" data-v="avancado" aria-checked="false">Modo Avançado</button></div></div>
+    <div class="panel guia-rapida" id="guia-rapida"><header><h2>Como iniciar uma análise</h2><button class="btn quiet sm" id="b-guia-fechar" type="button" aria-label="Recolher o guia">Recolher</button></header>
+      <ol class="passos" id="passos">
+        <li data-p="1"><strong>Anexar os autos</strong><span>Arraste o PDF ou use os autos de exemplo. Assinaturas, carimbos e cabeçalhos repetidos são removidos.</span></li>
+        <li data-p="2"><strong>Escolher prompt e ato</strong><span>Prompt da área e tipo de minuta, ou deixe em Auto-detectar pela fase processual.</span></li>
+        <li data-p="3"><strong>Minuta Paradigma (opcional)</strong><span>No Modo Avançado, vincule um modelo do magistrado para clonar estilo, tópicos e dispositivo.</span></li>
+        <li data-p="4"><strong>Executar e conferir</strong><span>Gere em duas etapas, revise a conferência e converse com o Claude sobre a minuta.</span></li>
+      </ol></div>
     <div class="grid g-side">
       <div class="stack">
         <div class="panel"><header><h2>1 · Autos processuais</h2></header><div class="body">
@@ -288,11 +322,11 @@ th:first-child, td:first-child { text-align: left; }
               <button type="button" role="radio" data-v="auto" aria-checked="true">Auto-detectar</button><button type="button" role="radio" data-v="sentenca" aria-checked="false">Sentença</button><button type="button" role="radio" data-v="decisao" aria-checked="false">Decisão</button><button type="button" role="radio" data-v="despacho" aria-checked="false">Despacho</button><button type="button" role="radio" data-v="embargos" aria-checked="false">Embargos</button>
             </div>
           </div>
-          <label class="f" for="s-paradigma">Minuta Paradigma (espelho estrutural)
+          <label class="f avancado" for="s-paradigma">Minuta Paradigma (espelho estrutural)
             <select id="s-paradigma"><option value="">Sem paradigma</option></select>
           </label>
           <label class="row small" for="c-teses"><input type="checkbox" id="c-teses" checked> Aplicar o Caderno de Teses do Gabinete</label>
-          <label class="f" for="t-instrucao">Orientação para este caso (opcional)
+          <label class="f avancado" for="t-instrucao">Co-piloto: orientação para este caso (opcional)
             <textarea id="t-instrucao" rows="3" placeholder="Ex.: examinar a impugnação da assinatura do contrato (Tema 1.061/STJ)."></textarea>
           </label>
           <div class="row"><button class="btn" id="b-gerar" type="button" disabled>Gerar minuta em 2 etapas</button><button class="btn danger" id="b-parar" type="button" hidden>Parar</button></div>
@@ -309,7 +343,10 @@ th:first-child, td:first-child { text-align: left; }
         </div></div>
       </div>
       <div class="panel"><header><h2 id="minuta-h">Minuta</h2><div class="row" id="minuta-actions"></div></header>
-        <div class="body"><div id="minuta" class="folha"></div></div></div>
+        <div class="subtabs" id="res-tabs" role="tablist" aria-label="Resultado">
+          <button type="button" data-v="minuta" aria-selected="true">Minuta</button><button type="button" data-v="linha" aria-selected="false">Linha do tempo</button><button type="button" data-v="fato" aria-selected="false">Fato × Prova</button><button type="button" data-v="conf" aria-selected="false">Conformidade</button><button type="button" data-v="raiox" aria-selected="false">Raio-X</button><button type="button" data-v="versoes" aria-selected="false">Versões <span id="n-versoes"></span></button>
+        </div>
+        <div class="body"><div id="minuta" class="folha"></div><div id="res-view" hidden></div></div></div>
     </div>
   </section>
 

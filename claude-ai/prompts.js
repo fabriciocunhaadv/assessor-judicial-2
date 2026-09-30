@@ -214,5 +214,41 @@ Responda SOMENTE com JSON:
 ${trecho}
 </trecho>`;
 
-  root.PROMPTS = { REGRA_POR_ATO, stage1, stage2, aprofundar, auditoria, gabarito, audiencia, termo, chat, precedentes };
+  const fatoProva = (dossie, minuta) => `${REGRAS}
+
+PAPEL: ANALISTA FÁTICO-PROBATÓRIO. Monte a matriz de confronto Fato × Prova da minuta: para cada fato relevante para o julgamento, indique a prova que o sustenta ou afasta (com a localização Mov./Arq./Pág. do dossiê), a análise da prova, o fundamento jurídico aplicado (lei, súmula, tema, tese ou paradigma do gabinete citados na minuta) e a valoração judicial (impacto no resultado). Use somente o dossiê e a minuta; se um fato não tiver prova nos autos, diga "sem prova nos autos".
+
+Responda SOMENTE com JSON:
+{"itens":[{"fato":"","prova":"","localizacao":"","analise":"","fundamento":"","valoracao":""}]}
+
+<dossie_fatico>
+${JSON.stringify(dossie)}
+</dossie_fatico>
+
+<minuta>
+${minuta}
+</minuta>`;
+
+  const conformidade = (autos, dossie) => `${REGRAS}
+
+PAPEL: CONFERENTE DE CONFORMIDADE PROCESSUAL. Verifique nos autos, item por item, e aponte alertas e pontos críticos antes da decisão:
+1. Competência e pressupostos: competência material, territorial (art. 4º da Lei 9.099/95 ou CDC), teto e alçada (JEC: 40 salários mínimos; sem advogado: 20), legitimidade das partes (art. 8º da Lei 9.099/95 no JEC).
+2. Regularidade documental: procuração e poderes específicos (art. 105 do CPC), comprovante de endereço (titularidade e data), documentos indispensáveis (art. 320 do CPC).
+3. Gratuidade e custas; prescrição e decadência.
+4. Marcha processual: citação válida, prazos de defesa, intimações, conformidade com a fase atual.
+5. Consectários (Lei nº 14.905/2024): índices e termos iniciais cabíveis.
+Status: "ok" (verificado e regular), "alerta" (dúvida ou ponto a conferir), "falha" (irregularidade), "nao_aplicavel". Indique a localização quando houver.
+
+Responda SOMENTE com JSON:
+{"itens":[{"grupo":"","requisito":"","status":"ok|alerta|falha|nao_aplicavel","observacao":"","localizacao":""}],"sintese":""}
+
+<dossie_fatico>
+${JSON.stringify(dossie || {})}
+</dossie_fatico>
+
+<autos>
+${autos}
+</autos>`;
+
+  root.PROMPTS = { REGRA_POR_ATO, stage1, stage2, aprofundar, auditoria, gabarito, audiencia, termo, chat, precedentes, fatoProva, conformidade };
 })(window);
