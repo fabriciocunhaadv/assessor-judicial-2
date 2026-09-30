@@ -13,8 +13,9 @@ audienciaRouter.post("/painel", requirePermission("audiencia:usar"), async (req,
   const b = z.object({ autos: z.string().min(100), participantes: z.array(z.string()).default([]) }).parse(req.body);
   const { data } = await generateValidated(req.user!, "audiencia", PainelAudiencia, {
     system: HEARING_SYSTEM,
-    messages: [{ role: "user", content: `SCHEMA:\n${schemaText(PainelAudiencia)}\n\nParticipantes previstos: ${b.participantes.join("; ") || "não informados"}\n\n<autos>\n${b.autos}\n</autos>` }],
-    temperature: 0,
+    documento: { rotulo: "autos", texto: b.autos },
+    messages: [{ role: "user", content: `SCHEMA:\n${schemaText(PainelAudiencia)}\n\nParticipantes previstos: ${b.participantes.join("; ") || "não informados"}` }],
+    esforco: "high",
   });
   res.json(data);
 });
@@ -24,7 +25,7 @@ audienciaRouter.post("/termo", requirePermission("audiencia:usar"), async (req, 
   const r = await orchestrator.generate({
     system: TERMO_SYSTEM,
     messages: [{ role: "user", content: `Tipo: ${b.tipo}\nCabeçalho do processo: ${b.cabecalho}\n\nAnotações do(a) magistrado(a):\n${b.anotacoes}` }],
-    temperature: 0.1,
+    esforco: "medium",
     maxOutputTokens: 8_000,
   });
   await registrarUso(req.user!, "audiencia", r);

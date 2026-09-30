@@ -1,6 +1,18 @@
 /** Registro de mudanças exibido no Manual. Acrescente uma entrada a cada entrega. */
 export const CHANGELOG: { data: string; titulo: string; itens: string[] }[] = [
   {
+    data: "30/09/2026",
+    titulo: "Tudo com o Claude",
+    itens: [
+      "Motor de IA 100% Claude: Gemini e OpenAI foram removidos. Troca automática de chave e de modelo do Claude em caso de sobrecarga.",
+      "Cada tarefa usa a profundidade de raciocínio adequada (alta para minutas e auditorias, média para chat e resumos).",
+      "Cache de prompt: autos e Resumo Executivo são reaproveitados entre chamadas, e o painel do Super Admin mostra a economia.",
+      "O Resumo Executivo agora é gerado em paralelo com a minuta.",
+      "Pesquisa ao vivo com o Claude em Súmulas e em Legislação & Juros, só em sites oficiais e com as fontes citadas.",
+      "Nova identidade visual: cor terracota e selo \"Claude\" em tudo o que foi produzido pela IA.",
+    ],
+  },
+  {
     data: "29/09/2026",
     titulo: "Agenda, Guia do PROJUDI, Word e Manual",
     itens: [

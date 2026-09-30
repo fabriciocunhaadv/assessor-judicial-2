@@ -26,7 +26,7 @@ node claude-ai/test-core.mjs   # testes do núcleo da versão claude.ai
 2. Antes de todo push: `npm run typecheck && npm test`. Mudou `claude-ai/core.js`: `node claude-ai/test-core.mjs`.
 3. Funcionalidade nova ou alterada: atualize `README.md` (tabela da API e estrutura), marque a fase em `docs/PLANO.md` e acrescente uma entrada em `web/src/lib/changelog.ts` (aparece no Manual de uso).
 4. Prompts: mantenha o prefixo `REGRAS_INEGOCIAVEIS` (`server/ai/prompts/base.ts`) byte a byte estável — ele é o prefixo de cache.
-5. Modelos Claude: padrão `claude-opus-5-5`. Não envie `temperature` para modelos Claude atuais (400); controle profundidade com `output_config.effort`.
+5. O motor de IA é somente o Claude (sem Gemini/OpenAI). Padrão `claude-opus-5-5`. Não envie `temperature` (400); defina `esforco` em cada chamada. Documentos grandes (autos, resumo) vão em `documento` (cache de prompt), não no `system`. Conteúdo gerado pelo Claude na interface leva `<ClaudeTag>` e a classe `claude-output`; a cor de destaque é `clay-*`.
 6. Nunca versione autos, históricos, backups, `.env` ou chaves. Se encontrar um segredo no código ou no histórico, pare e avise o usuário.
 7. Mudanças que apagam dados ou reescrevem histórico do git só com confirmação explícita.
 

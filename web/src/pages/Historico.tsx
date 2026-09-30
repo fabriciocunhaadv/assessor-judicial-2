@@ -17,18 +17,18 @@ export default function Historico() {
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-lg font-semibold text-slate-900 dark:text-white">Histórico</h1>
-        <p className="text-sm text-slate-500">Últimas 50 minutas do gabinete. Os autos não são guardados, só a minuta e o resumo executivo.</p>
+        <h1 className="text-lg font-semibold text-stone-900 dark:text-white">Histórico</h1>
+        <p className="text-sm text-stone-500">Últimas 50 minutas do gabinete. Os autos não são guardados, só a minuta e o resumo executivo.</p>
       </div>
       <ErrorBox erro={erro} />
-      <Card bodyClass="divide-y divide-slate-100 dark:divide-slate-800">
-        {itens === null ? <p className="p-4 text-sm text-slate-500">Carregando…</p> : itens.length === 0 ? (
+      <Card bodyClass="divide-y divide-stone-100 dark:divide-stone-800">
+        {itens === null ? <p className="p-4 text-sm text-stone-500">Carregando…</p> : itens.length === 0 ? (
           <EmptyState icon={<History className="h-6 w-6" />} title="Nenhuma minuta ainda">As minutas geradas pela equipe aparecem aqui.</EmptyState>
         ) : itens.map((m) => (
           <div key={m.id} className="flex flex-wrap items-center justify-between gap-3 p-4">
             <div>
-              <p className="font-mono text-sm font-medium text-slate-900 dark:text-slate-100">{m.numeroProcesso}</p>
-              <p className="text-xs text-slate-500">{m.tipoAto} · {new Date(m.criadoEm).toLocaleString("pt-BR")}</p>
+              <p className="font-mono text-sm font-medium text-stone-900 dark:text-stone-100">{m.numeroProcesso}</p>
+              <p className="text-xs text-stone-500">{m.tipoAto} · {new Date(m.criadoEm).toLocaleString("pt-BR")}</p>
             </div>
             <Button size="sm" variant="ghost" disabled={!m.minuta?.markdown} onClick={() => { atualizar({ nomeArquivo: `Histórico ${m.numeroProcesso} (sem os autos)`, pdfUrl: null, autos: "", paginas: 0, minuta: m.minuta.markdown ?? "", resumoExecutivo: m.resumoExecutivo, numeroProcesso: m.numeroProcesso, resultado: null }); navigate("/"); }}>Abrir minuta</Button>
           </div>

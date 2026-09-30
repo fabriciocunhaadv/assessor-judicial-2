@@ -14,6 +14,7 @@ import { lupaRouter } from "./routes/lupa.js";
 import { minutasRouter } from "./routes/minutas.js";
 import { miscRouter } from "./routes/misc.js";
 import { pdfRouter } from "./routes/pdf.js";
+import { pesquisaRouter } from "./routes/pesquisa.js";
 import { precedentesRouter } from "./routes/precedentes.js";
 
 export function createApp() {
@@ -33,6 +34,7 @@ export function createApp() {
   app.use("/api/lupa", limiteIA, lupaRouter);
   app.use("/api/audiencia", limiteIA, audienciaRouter);
   app.use("/api/chat", limiteIA, chatRouter);
+  app.use("/api/pesquisa", limiteIA, pesquisaRouter);
   app.use("/api/pdf", pdfRouter);
   app.use("/api/precedentes", (req, res, next) => (req.path.startsWith("/importar") ? limiteIA(req, res, next) : next()), precedentesRouter);
   app.use("/api/gabinete", gabineteRouter);

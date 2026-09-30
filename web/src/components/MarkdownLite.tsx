@@ -14,7 +14,7 @@ function inline(text: string): ReactNode[] {
 export function MarkdownLite({ text }: { text: string }) {
   const blocks = text.split(/\n\s*\n/);
   return (
-    <div className="minuta text-slate-900 dark:text-slate-100">
+    <div className="minuta text-stone-900 dark:text-stone-100">
       {blocks.map((b, i) => {
         const t = b.trim();
         if (/^#{1,3}\s/.test(t)) return <h2 key={i}>{inline(t.replace(/^#{1,3}\s/, ""))}</h2>;

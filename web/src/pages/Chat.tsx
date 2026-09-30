@@ -1,7 +1,7 @@
 import { Send } from "lucide-react";
 import { useState } from "react";
 import { MarkdownLite } from "../components/MarkdownLite";
-import { Button, Card, ErrorBox, textareaCls } from "../components/ui";
+import { Button, Card, ClaudeTag, ErrorBox, textareaCls } from "../components/ui";
 import { api } from "../lib/api";
 import { useCaso } from "../lib/caso";
 
@@ -35,13 +35,14 @@ export default function Chat() {
 
   const pronto = caso.resumoExecutivo && caso.minuta;
   return (
-    <Card title="Chat de refino jurídico" actions={tokens && <span className="text-xs text-slate-500">última troca: {tokens.entrada.toLocaleString("pt-BR")} tokens de entrada (Resumo Executivo, não os autos integrais)</span>}>
-      {!pronto && <p className="mb-3 text-sm text-slate-500">Gere uma minuta na Esteira primeiro — o chat trabalha sobre o Resumo Executivo e a minuta atual.</p>}
+    <Card title="Chat de refino jurídico" actions={tokens && <span className="text-xs text-stone-500">última troca: {tokens.entrada.toLocaleString("pt-BR")} tokens de entrada (Resumo Executivo, não os autos integrais)</span>}>
+      {!pronto && <p className="mb-3 text-sm text-stone-500">Gere uma minuta na Esteira primeiro — o chat trabalha sobre o Resumo Executivo e a minuta atual.</p>}
       <div className="mb-4 max-h-[60vh] space-y-4 overflow-auto">
         {historico.map((m, i) => (
-          <div key={i} className={m.role === "user" ? "ml-auto max-w-2xl rounded-lg bg-emerald-50 p-3 text-sm dark:bg-emerald-950" : "rounded-lg border border-slate-200 p-3 dark:border-slate-800"}>
+          <div key={i} className={m.role === "user" ? "ml-auto max-w-2xl rounded-lg bg-stone-100 p-3 text-sm dark:bg-stone-800" : "claude-output rounded-r-lg bg-clay-50/50 py-3 pr-3 dark:bg-clay-950/40"}>
             {m.role === "assistant" ? (
               <>
+                <ClaudeTag>Claude</ClaudeTag>
                 <MarkdownLite text={m.content} />
                 <Button variant="ghost" className="mt-2" onClick={() => atualizar({ minuta: m.content.replace(SEPARADOR, "").trim() })}>Aplicar como minuta atual</Button>
               </>

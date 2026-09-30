@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { PainelAudiencia } from "@shared/schemas";
 import { MarkdownLite } from "../components/MarkdownLite";
-import { Button, Card, ErrorBox, textareaCls } from "../components/ui";
+import { Button, Card, ClaudeTag, ErrorBox, textareaCls } from "../components/ui";
 import { api } from "../lib/api";
 import { useCaso } from "../lib/caso";
 
@@ -43,11 +43,11 @@ export default function Audiencia() {
             ))}
             <div>
               <h3 className="font-semibold">Perguntas sugeridas</h3>
-              <ol className="list-decimal space-y-1 pl-5">{painel.perguntas.map((p, i) => <li key={i}><strong>{p.destinatario}:</strong> {p.pergunta} <span className="text-xs text-slate-500">({p.finalidade})</span></li>)}</ol>
+              <ol className="list-decimal space-y-1 pl-5">{painel.perguntas.map((p, i) => <li key={i}><strong>{p.destinatario}:</strong> {p.pergunta} <span className="text-xs text-stone-500">({p.finalidade})</span></li>)}</ol>
             </div>
           </div>
         ) : (
-          <p className="text-sm text-slate-500">Usa o Resumo Executivo do caso atual (ou os autos, se ainda não houver resumo).</p>
+          <p className="text-sm text-stone-500">Usa o Resumo Executivo do caso atual (ou os autos, se ainda não houver resumo).</p>
         )}
       </Card>
 
@@ -61,7 +61,7 @@ export default function Audiencia() {
           <textarea rows={8} value={anotacoes} onChange={(e) => setAnotacoes(e.target.value)} className={textareaCls} placeholder="Anotações livres: presentes, ocorrências, proposta aceita (valor, parcelas, vencimentos, multa)…" />
           <Button loading={carregando === "termo"} disabled={anotacoes.length < 20} onClick={() => run("termo", async () => setTermo((await api.post<{ termo: string }>("/audiencia/termo", { anotacoes, tipo, cabecalho: caso.numeroProcesso })).termo))}>Redigir termo</Button>
           <ErrorBox erro={erro} />
-          {termo && <div className="rounded-lg border border-slate-200 p-4 dark:border-slate-800"><MarkdownLite text={termo} /></div>}
+          {termo && <div className="claude-output space-y-2"><ClaudeTag>Termo redigido pelo Claude</ClaudeTag><MarkdownLite text={termo} /></div>}
         </div>
       </Card>
     </div>

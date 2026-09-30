@@ -53,25 +53,25 @@ function useTema() {
 function Login() {
   const { firebaseUser, erro, entrar, sair } = useAuth();
   return (
-    <div className="grid min-h-screen bg-slate-950 lg:grid-cols-2">
-      <div className="hidden flex-col justify-between p-12 text-slate-100 lg:flex">
-        <div className="flex items-center gap-3"><div className="grid h-10 w-10 place-items-center rounded-lg bg-emerald-600"><Gavel className="h-5 w-5" /></div><span className="text-lg font-semibold">Assessor Judicial IA</span></div>
+    <div className="grid min-h-screen bg-stone-950 lg:grid-cols-2">
+      <div className="hidden flex-col justify-between p-12 text-stone-100 lg:flex">
+        <div className="flex items-center gap-3"><div className="grid h-10 w-10 place-items-center rounded-lg bg-clay-600"><Gavel className="h-5 w-5" /></div><span className="text-lg font-semibold">Assessor Judicial IA</span></div>
         <div className="space-y-4">
           <p className="max-w-md text-3xl font-semibold leading-tight">Minutas fiéis aos autos, conferidas antes da assinatura.</p>
-          <ul className="space-y-2 text-sm text-slate-300">
+          <ul className="space-y-2 text-sm text-stone-300">
             <li>• Duas etapas: Assessor Fático e Juiz Revisor, com Mov./Arq./Pág. em cada fato</li>
             <li>• Conferência automática de pedidos, valores, datas e números de processo</li>
             <li>• Lupa do Magistrado, Mesa de Audiência e consectários da Lei nº 14.905/2024</li>
           </ul>
         </div>
-        <p className="text-xs text-slate-500">Acesso restrito a membros convidados de cada gabinete.</p>
+        <p className="text-xs text-stone-500">Acesso restrito a membros convidados de cada gabinete.</p>
       </div>
-      <div className="grid place-items-center bg-slate-50 p-6 dark:bg-slate-900">
-        <div className="w-full max-w-sm space-y-5 rounded-2xl border border-slate-200 bg-white p-8 shadow-sm dark:border-slate-800 dark:bg-slate-950">
+      <div className="grid place-items-center bg-stone-50 p-6 dark:bg-stone-900">
+        <div className="w-full max-w-sm space-y-5 rounded-2xl border border-stone-200 bg-white p-8 shadow-sm dark:border-stone-800 dark:bg-stone-950">
           <div className="space-y-1 text-center">
-            <ShieldCheck className="mx-auto h-10 w-10 text-emerald-600" />
-            <h1 className="text-lg font-semibold text-slate-900 dark:text-white">Entrar no gabinete</h1>
-            <p className="text-sm text-slate-500">Use o e-mail Google em que o Juiz Titular liberou seu acesso.</p>
+            <ShieldCheck className="mx-auto h-10 w-10 text-clay-600" />
+            <h1 className="text-lg font-semibold text-stone-900 dark:text-white">Entrar no gabinete</h1>
+            <p className="text-sm text-stone-500">Use o e-mail Google em que o Juiz Titular liberou seu acesso.</p>
           </div>
           {firebaseUser && <ErrorBox erro={erro} />}
           {authDisabled && <ErrorBox erro={erro ?? "API indisponível. Inicie o servidor com npm run dev."} />}
@@ -89,12 +89,12 @@ export default function App() {
   const { teses, paradigmas, prompts } = useGabinete();
   const [escuro, alternarTema] = useTema();
 
-  if (carregando) return <div className="grid h-screen place-items-center bg-slate-50 text-slate-500 dark:bg-slate-950">Carregando…</div>;
+  if (carregando) return <div className="grid h-screen place-items-center bg-stone-50 text-stone-500 dark:bg-stone-950">Carregando…</div>;
   if (!perfil) return <Login />;
 
   const itens = navItems({ teses: teses.filter((t) => t.ativa !== false).length, paradigmas: paradigmas.length, prompts: prompts.length }).filter((n) => pode(n.perm));
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
+    <div className="min-h-screen bg-stone-50 text-stone-900 dark:bg-stone-950 dark:text-stone-100">
       <TopBar escuro={escuro} alternarTema={alternarTema} itensMobile={itens} />
       <div className="flex min-h-[calc(100vh-3.5rem)]">
         <Sidebar itens={itens} />

@@ -136,7 +136,13 @@ export interface RegistroUso {
   model: string;
   inputTokens: number;
   outputTokens: number;
+  /** Tokens lidos/gravados no cache de prompt (registros antigos não têm). */
+  cacheLeitura?: number;
+  cacheEscrita?: number;
+  buscasWeb?: number;
   usd: number;
+  /** Quanto o cache poupou nesta chamada. */
+  economiaUsd?: number;
   tabelado: boolean;
   em: number;
 }
