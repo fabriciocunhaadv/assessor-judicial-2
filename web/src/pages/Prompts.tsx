@@ -67,29 +67,29 @@ export default function Prompts() {
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-lg font-semibold text-slate-900 dark:text-white">Prompts por área</h1>
-        <p className="text-sm text-slate-500">Instruções próprias do gabinete para cada matéria. O prompt ativo entra na redação da minuta junto com as regras fixas do sistema.</p>
+        <h1 className="text-lg font-semibold text-stone-900 dark:text-white">Prompts por área</h1>
+        <p className="text-sm text-stone-500">Instruções próprias do gabinete para cada matéria. O prompt ativo entra na redação da minuta junto com as regras fixas do sistema.</p>
       </div>
       <ErrorBox erro={erro} />
       {info && <Notice tone="ok">{info}</Notice>}
       <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,460px)]">
         <Card title={`Prompts do gabinete (${todos.length})`} bodyClass="space-y-5 p-4" actions={<>
-          {podeEditar && <label className={`inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-slate-300 px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800 ${salvando ? "pointer-events-none opacity-50" : ""}`}><Upload className="h-3.5 w-3.5" /> Importar JSON<input type="file" accept="application/json,.json" className="hidden" onChange={(e) => { void importar(e.target.files?.[0]); e.target.value = ""; }} /></label>}
+          {podeEditar && <label className={`inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-stone-300 px-2.5 py-1.5 text-xs font-medium text-stone-700 hover:bg-stone-50 dark:border-stone-700 dark:text-stone-200 dark:hover:bg-stone-800 ${salvando ? "pointer-events-none opacity-50" : ""}`}><Upload className="h-3.5 w-3.5" /> Importar JSON<input type="file" accept="application/json,.json" className="hidden" onChange={(e) => { void importar(e.target.files?.[0]); e.target.value = ""; }} /></label>}
           <Button size="sm" variant="ghost" disabled={!todos.length} onClick={exportar}><Download className="h-3.5 w-3.5" /> Backup JSON</Button>
         </>}>
           {todos.length ? areas.map((a) => (
             <div key={a} className="space-y-2">
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{a}</p>
+              <p className="text-xs font-semibold uppercase tracking-wide text-stone-500">{a}</p>
               {todos.filter((p) => p.area === a).map((p) => (
-                <div key={p.id} className={`rounded-lg border p-3 ${promptId === p.id ? "border-emerald-400 bg-emerald-50/50 dark:border-emerald-700 dark:bg-emerald-950/30" : "border-slate-200 dark:border-slate-800"}`}>
+                <div key={p.id} className={`rounded-lg border p-3 ${promptId === p.id ? "border-clay-400 bg-clay-50/50 dark:border-clay-700 dark:bg-clay-950/30" : "border-stone-200 dark:border-stone-800"}`}>
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <p className="flex flex-wrap items-center gap-1.5 font-medium text-slate-900 dark:text-slate-100"><Badge tone="slate">{p.area}</Badge> {p.titulo} {p.ativo === false && <Badge>inativo</Badge>} {promptId === p.id && <Badge tone="green">✓ Em uso</Badge>}</p>
+                    <p className="flex flex-wrap items-center gap-1.5 font-medium text-stone-900 dark:text-stone-100"><Badge tone="slate">{p.area}</Badge> {p.titulo} {p.ativo === false && <Badge>inativo</Badge>} {promptId === p.id && <Badge tone="green">✓ Em uso</Badge>}</p>
                     <div className="flex gap-2">
                       {p.ativo !== false && (promptId === p.id ? <Button size="sm" variant="dark" onClick={() => setPromptId("")}>Ativo</Button> : <Button size="sm" variant="ghost" onClick={() => setPromptId(p.id)}>Selecionar</Button>)}
                       {podeEditar && <Button size="sm" variant="subtle" onClick={() => setEdit({ id: p.id, titulo: p.titulo, area: p.area, texto: p.texto, ativo: p.ativo !== false })}>Editar</Button>}
                     </div>
                   </div>
-                  <p className="mt-1 line-clamp-2 whitespace-pre-wrap text-sm text-slate-500">{p.texto}</p>
+                  <p className="mt-1 line-clamp-2 whitespace-pre-wrap text-sm text-stone-500">{p.texto}</p>
                 </div>
               ))}
             </div>
@@ -104,11 +104,11 @@ export default function Prompts() {
             <Field label="Instruções" hint={`${edit.texto.length.toLocaleString("pt-BR")} / 30.000`}>
               <textarea rows={12} className={`${inputCls} font-mono text-xs`} value={edit.texto} onChange={(e) => setEdit({ ...edit, texto: e.target.value })} placeholder={"Ex.:\n1. Aplique os Enunciados do FONAJE pertinentes.\n2. Em desconto indevido de benefício, examine a Súmula 479/STJ.\n3. Fixe o dano moral pelos parâmetros do juízo."} />
             </Field>
-            <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200"><input type="checkbox" className="accent-emerald-600" checked={edit.ativo} onChange={(e) => setEdit({ ...edit, ativo: e.target.checked })} /> Disponível para a equipe</label>
+            <label className="flex items-center gap-2 text-sm text-stone-700 dark:text-stone-200"><input type="checkbox" className="accent-clay-600" checked={edit.ativo} onChange={(e) => setEdit({ ...edit, ativo: e.target.checked })} /> Disponível para a equipe</label>
             <Button loading={salvando} disabled={edit.titulo.length < 3 || edit.texto.length < 20} onClick={salvar}>{edit.id ? "Salvar alterações" : "Adicionar prompt"}</Button>
-            <p className="text-xs text-slate-500">Cada alteração guarda a versão anterior no histórico. Nada é apagado.</p>
+            <p className="text-xs text-stone-500">Cada alteração guarda a versão anterior no histórico. Nada é apagado.</p>
           </Card>
-        ) : <p className="text-sm text-slate-500">Só o Juiz Titular cria e altera prompts. Você pode escolher qual usar.</p>}
+        ) : <p className="text-sm text-stone-500">Só o Juiz Titular cria e altera prompts. Você pode escolher qual usar.</p>}
       </div>
     </div>
   );

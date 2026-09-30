@@ -8,7 +8,7 @@ Aplicação web para gabinetes de magistrados (Varas Cíveis, Juizados Especiais
 npm install
 cp .env.example .env
 # no .env: AUTH_DISABLED=true, VITE_AUTH_DISABLED=true, DATA_BACKEND=memory
-# e pelo menos uma chave de IA (GEMINI_API_KEYS ou ANTHROPIC_API_KEYS)
+# e a chave do Claude em ANTHROPIC_API_KEYS (console.anthropic.com → API Keys)
 npm run dev          # API em :8787 e interface em http://localhost:5173
 npm test             # testes unitários
 npm run typecheck
@@ -38,13 +38,13 @@ server/
   index.ts, app.ts          bootstrap Express 5
   config/env.ts             variáveis de ambiente + travas de segurança de produção
   middleware/               requireAuth (Firebase ID Token), requirePermission, rateLimit, errorHandler
-  ai/orchestrator.ts        cascata provedor → modelo → chave; retry 429/503; fallback
-  ai/providers/             gemini.ts, anthropic.ts, openai.ts
+  ai/orchestrator.ts        cascata modelo → chave do Claude; retry 429/529; fallback
+  ai/providers/anthropic.ts requisição ao Claude: cache de prompt, effort, busca na web, fallback de recusa
   ai/prompts/               Etapa 1, Etapa 2, auditor, audiência, chat, resumo, indexador
   pipelines/                minutePipeline (2 etapas), synopsis (Resumo Executivo), precedentsImport (chunking)
   services/                 llmJson (validação zod + nova tentativa), pdfService, precedentMatcher, usage
   repositories/             interface + implementação Firestore (merge, histórico) e em memória
-  routes/                   minutas, lupa, audiencia, chat, pdf, precedentes, gabinete, admin, misc
+  routes/                   minutas, lupa, audiencia, chat, pesquisa, pdf, precedentes, gabinete, admin, misc
 web/src/
   pages/                    Esteira, Lupa (3 painéis), Audiência, Chat, Precedentes, Gabinete, Admin
   lib/                      firebase, auth, api, pdf (PDF.js + limpeza), caso (estado do processo)
@@ -79,12 +79,23 @@ docs/PLANO.md               plano de desenvolvimento por fases
 | GET | `/api/admin/consumo`, `/api/admin/motor` | admin:custos | Tokens e custos; cascata de IA |
 | POST | `/api/consectarios/calcular` | autenticado | Cálculo Lei 14.905/2024 |
 
-## Motor de IA
+## Motor de IA: Claude
 
-- Ordem de provedores em `AI_PROVIDER_ORDER`; modelos por provedor em `*_MODELS`; várias chaves por provedor em `*_API_KEYS` (separadas por vírgula).
-- Em 503, sobrecarga ou timeout, o sistema tenta de novo no mesmo modelo com espera exponencial e depois passa ao próximo modelo. Em 429 por minuto, espera e depois troca de chave. Com a cota esgotada ou a chave inválida, troca de chave na hora. Em 400, passa ao próximo modelo. Em recusa de segurança, passa ao próximo provedor.
-- Na Etapa 1, o Gemini recebe `temperature: 0`. O Claude (`claude-opus-5-5`) não aceita parâmetros de amostragem: a profundidade é controlada por `ANTHROPIC_EFFORT`, e o fallback de recusa do próprio servidor da Anthropic (`fallbacks: "default"`) fica ativado.
-- Os preços do Gemini e da OpenAI não vêm preenchidos (dependem do contrato). Cadastre-os em `shared/pricing.ts`; enquanto isso, o painel mostra esses modelos como "sem preço".
+Todo o processamento de IA roda no Claude (Anthropic). Não há mais Gemini nem OpenAI.
+
+- **Chaves e modelos:** `ANTHROPIC_API_KEYS` (várias, separadas por vírgula) e `ANTHROPIC_MODELS` (cascata; padrão `claude-opus-5-5`).
+- **Cascata:** em 529/5xx ou timeout, tenta de novo no mesmo modelo com espera exponencial; em 429, espera e troca de chave; com crédito esgotado ou chave inválida, troca de chave na hora; em 400 ou recusa, passa ao próximo modelo. Recusas de segurança também são refeitas pelo próprio servidor da Anthropic no modelo de apoio (`fallbacks: "default"`).
+- **Profundidade por tarefa** (`output_config.effort`; o Claude não aceita `temperature`):
+
+  | Tarefa | Esforço |
+  |---|---|
+  | Etapa 1 (Assessor Fático), Etapa 2 (Juiz Revisor), aprofundamento, Lupa, painel de audiência | high |
+  | Resumo Executivo, chat, termo de audiência, indexação de precedentes, pesquisa ao vivo | medium |
+
+- **Cache de prompt:** os autos (Etapa 1, Resumo Executivo, Lupa, audiência) e o Resumo Executivo (chat, cache de 1 h) vão como documento com marcador de cache. Retentativas e mensagens seguintes do chat leem o documento do cache a 10% do preço de entrada. A economia aparece no painel do Super Admin.
+- **Pesquisa ao vivo** (`POST /api/pesquisa`): busca na web do Claude restrita a sites oficiais (STF, STJ, CJF/TNU, TJGO, CNJ; Planalto, Câmara e Senado para legislação), com as fontes citadas. Disponível em Súmulas e em Legislação & Juros.
+- **Custos:** `shared/pricing.ts` traz os preços por modelo, cache (leitura 0,1×, escrita 1,25×) e busca na web (US$ 10 por 1.000).
+- **Identidade visual:** tudo o que o Claude produz (minuta, gabarito, auditoria, termo, chat, pesquisa) aparece com o selo "Claude" e a barra lateral terracota.
 
 ## Versão que roda dentro do claude.ai
 

@@ -13,7 +13,7 @@ const TIPO: Record<Tipo, { rotulo: string; tom: "red" | "violet" | "sky" | "slat
   prazo: { rotulo: "Prazo", tom: "red", ponto: "bg-rose-500" },
   audiencia: { rotulo: "Audiência", tom: "violet", ponto: "bg-violet-500" },
   diligencia: { rotulo: "Diligência", tom: "sky", ponto: "bg-sky-500" },
-  outro: { rotulo: "Outro", tom: "slate", ponto: "bg-slate-400" },
+  outro: { rotulo: "Outro", tom: "slate", ponto: "bg-stone-400" },
 };
 const MESES = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
 const hoje = () => new Date().toLocaleDateString("sv-SE"); // AAAA-MM-DD no fuso local
@@ -73,8 +73,8 @@ export default function Agenda() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-lg font-semibold text-slate-900 dark:text-white">Agenda do gabinete</h1>
-          <p className="text-sm text-slate-500">Prazos, audiências e diligências da equipe, com contagem de prazos em dias úteis pelo CPC.</p>
+          <h1 className="text-lg font-semibold text-stone-900 dark:text-white">Agenda do gabinete</h1>
+          <p className="text-sm text-stone-500">Prazos, audiências e diligências da equipe, com contagem de prazos em dias úteis pelo CPC.</p>
         </div>
         <Button onClick={() => { setAba("calendario"); setForm({ ...vazio(dia), unidadeId }); }}><Plus className="h-4 w-4" /> Novo compromisso</Button>
       </div>
@@ -93,18 +93,18 @@ export default function Agenda() {
             <Button size="sm" variant="ghost" onClick={() => { const d = new Date(); setMes({ y: d.getFullYear(), m: d.getMonth() }); setDia(hoje()); }}>Hoje</Button>
             <Button size="sm" variant="ghost" onClick={() => mudarMes(1)} aria-label="Próximo mês"><ChevronRight className="h-4 w-4" /></Button>
           </>} bodyClass="p-3">
-            <div className="grid grid-cols-7 gap-1 text-center text-[11px] font-semibold uppercase tracking-wide text-slate-400">{["dom", "seg", "ter", "qua", "qui", "sex", "sáb"].map((d) => <div key={d} className="py-1">{d}</div>)}</div>
+            <div className="grid grid-cols-7 gap-1 text-center text-[11px] font-semibold uppercase tracking-wide text-stone-400">{["dom", "seg", "ter", "qua", "qui", "sex", "sáb"].map((d) => <div key={d} className="py-1">{d}</div>)}</div>
             <div className="grid grid-cols-7 gap-1">
               {celulas.map((d, i) => d === null ? <div key={`v${i}`} /> : (
                 <button key={d} type="button" onClick={() => setDia(d)} aria-pressed={dia === d} aria-label={`${fmt(d)}: ${(porDia.get(d) ?? []).length} compromisso(s)`}
-                  className={`flex min-h-[4.5rem] min-w-0 flex-col items-start gap-1 overflow-hidden rounded-lg border p-1.5 text-left text-xs transition ${dia === d ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-950/40" : "border-slate-100 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/50"}`}>
-                  <span className={`grid h-6 w-6 place-items-center rounded-full font-semibold tabular-nums ${d === hoje() ? "bg-emerald-600 text-white" : "text-slate-700 dark:text-slate-200"}`}>{Number(d.slice(8))}</span>
+                  className={`flex min-h-[4.5rem] min-w-0 flex-col items-start gap-1 overflow-hidden rounded-lg border p-1.5 text-left text-xs transition ${dia === d ? "border-clay-500 bg-clay-50 dark:bg-clay-950/40" : "border-stone-100 hover:bg-stone-50 dark:border-stone-800 dark:hover:bg-stone-800/50"}`}>
+                  <span className={`grid h-6 w-6 place-items-center rounded-full font-semibold tabular-nums ${d === hoje() ? "bg-clay-600 text-white" : "text-stone-700 dark:text-stone-200"}`}>{Number(d.slice(8))}</span>
                   <span className="flex flex-wrap gap-0.5">{(porDia.get(d) ?? []).slice(0, 6).map((e) => <span key={e.id} className={`h-1.5 w-1.5 rounded-full ${TIPO[e.tipo].ponto} ${e.concluido ? "opacity-30" : ""}`} />)}</span>
-                  {(porDia.get(d) ?? []).length > 0 && <span className="hidden w-full truncate text-[11px] text-slate-500 md:block">{(porDia.get(d) ?? [])[0].titulo}</span>}
+                  {(porDia.get(d) ?? []).length > 0 && <span className="hidden w-full truncate text-[11px] text-stone-500 md:block">{(porDia.get(d) ?? [])[0].titulo}</span>}
                 </button>
               ))}
             </div>
-            <div className="mt-3 flex flex-wrap gap-3 text-xs text-slate-500">{(Object.keys(TIPO) as Tipo[]).map((t) => <span key={t} className="flex items-center gap-1.5"><span className={`h-2 w-2 rounded-full ${TIPO[t].ponto}`} />{TIPO[t].rotulo}</span>)}</div>
+            <div className="mt-3 flex flex-wrap gap-3 text-xs text-stone-500">{(Object.keys(TIPO) as Tipo[]).map((t) => <span key={t} className="flex items-center gap-1.5"><span className={`h-2 w-2 rounded-full ${TIPO[t].ponto}`} />{TIPO[t].rotulo}</span>)}</div>
           </Card>
 
           <div className="space-y-4">
@@ -122,14 +122,14 @@ export default function Agenda() {
                 <div className="flex gap-2"><Button disabled={form.titulo.trim().length < 3 || !form.data} onClick={() => void salvar()}>Salvar</Button><Button variant="ghost" onClick={() => setForm(null)}>Cancelar</Button></div>
               </Card>
             ) : null}
-            <Card title={`Compromissos de ${fmt(dia)}`} icon={<CalendarClock className="h-4 w-4 text-emerald-600" />} actions={<Button size="sm" variant="ghost" onClick={() => setForm({ ...vazio(dia), unidadeId })}><Plus className="h-3.5 w-3.5" /> Adicionar</Button>} bodyClass="divide-y divide-slate-100 dark:divide-slate-800">
+            <Card title={`Compromissos de ${fmt(dia)}`} icon={<CalendarClock className="h-4 w-4 text-clay-600" />} actions={<Button size="sm" variant="ghost" onClick={() => setForm({ ...vazio(dia), unidadeId })}><Plus className="h-3.5 w-3.5" /> Adicionar</Button>} bodyClass="divide-y divide-stone-100 dark:divide-stone-800">
               {doDia.length ? doDia.map((e) => (
                 <div key={e.id} className="space-y-1.5 p-3">
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <p className={`font-medium ${e.concluido ? "text-slate-400 line-through" : "text-slate-900 dark:text-slate-100"}`}>{e.hora && <span className="mr-1.5 font-mono text-xs text-slate-500">{e.hora}</span>}{e.titulo}</p>
-                      <p className="flex flex-wrap items-center gap-1.5 text-xs text-slate-500"><Badge tone={TIPO[e.tipo].tom}>{TIPO[e.tipo].rotulo}</Badge>{e.processo && <span className="font-mono">{e.processo}</span>}{e.responsavel && <span>· {e.responsavel}</span>}{!e.concluido && e.data < hoje() && <Badge tone="red">vencido</Badge>}</p>
-                      {e.observacao && <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">{e.observacao}</p>}
+                      <p className={`font-medium ${e.concluido ? "text-stone-400 line-through" : "text-stone-900 dark:text-stone-100"}`}>{e.hora && <span className="mr-1.5 font-mono text-xs text-stone-500">{e.hora}</span>}{e.titulo}</p>
+                      <p className="flex flex-wrap items-center gap-1.5 text-xs text-stone-500"><Badge tone={TIPO[e.tipo].tom}>{TIPO[e.tipo].rotulo}</Badge>{e.processo && <span className="font-mono">{e.processo}</span>}{e.responsavel && <span>· {e.responsavel}</span>}{!e.concluido && e.data < hoje() && <Badge tone="red">vencido</Badge>}</p>
+                      {e.observacao && <p className="mt-1 text-xs text-stone-600 dark:text-stone-300">{e.observacao}</p>}
                     </div>
                     <div className="flex shrink-0 gap-1">
                       <Button size="sm" variant={e.concluido ? "ghost" : "subtle"} onClick={() => void alternar(e)} aria-label={e.concluido ? "Reabrir" : "Concluir"}><Check className="h-3.5 w-3.5" /></Button>
@@ -179,7 +179,7 @@ function CalculadoraPrazo({ salvarNaAgenda }: { salvarNaAgenda(e: { titulo: stri
   }
   return (
     <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,420px)_minmax(0,1fr)]">
-      <Card title="Parâmetros" icon={<Timer className="h-4 w-4 text-emerald-600" />} bodyClass="space-y-3 p-4">
+      <Card title="Parâmetros" icon={<Timer className="h-4 w-4 text-clay-600" />} bodyClass="space-y-3 p-4">
         <Field label="Ato / descrição"><input className={inputCls} value={f.ato} onChange={(e) => setF({ ...f, ato: e.target.value })} /></Field>
         <Field label="Processo" hint="opcional"><input className={`${inputCls} font-mono`} value={f.processo} onChange={(e) => setF({ ...f, processo: e.target.value })} /></Field>
         <div className="grid grid-cols-2 gap-3">
@@ -188,7 +188,7 @@ function CalculadoraPrazo({ salvarNaAgenda }: { salvarNaAgenda(e: { titulo: stri
         </div>
         <Segmented label="Contagem" value={f.uteis ? "uteis" : "corridos"} onChange={(v) => setF({ ...f, uteis: v === "uteis" })} options={[{ value: "uteis", label: "Dias úteis (CPC, art. 219)" }, { value: "corridos", label: "Dias corridos" }]} />
         <Field label="Datas sem expediente no tribunal" hint="feriados locais, suspensões"><textarea rows={2} className={`${inputCls} font-mono text-xs`} value={f.extras} onChange={(e) => setF({ ...f, extras: e.target.value })} placeholder="Ex.: 24/10/2025, 20/02/2026" /></Field>
-        <p className="text-xs text-slate-500">Já considerados: sábados, domingos, feriados nacionais e o recesso de 20/12 a 20/01 (art. 220). Carnaval, Semana Santa e feriados locais variam por tribunal: informe-os acima.</p>
+        <p className="text-xs text-stone-500">Já considerados: sábados, domingos, feriados nacionais e o recesso de 20/12 a 20/01 (art. 220). Carnaval, Semana Santa e feriados locais variam por tribunal: informe-os acima.</p>
         <Button onClick={calcular}>Calcular vencimento</Button>
         <ErrorBox erro={erro} />
       </Card>
@@ -196,18 +196,18 @@ function CalculadoraPrazo({ salvarNaAgenda }: { salvarNaAgenda(e: { titulo: stri
         {r ? (
           <div className="space-y-4">
             <div className="grid gap-3 sm:grid-cols-3">
-              <div className="rounded-lg bg-slate-50 p-3 dark:bg-slate-950"><p className="text-xs text-slate-500">Início da contagem</p><p className="text-lg font-semibold tabular-nums">{fmt(r.inicioContagem)}</p></div>
-              <div className="rounded-lg bg-emerald-50 p-3 dark:bg-emerald-950"><p className="text-xs text-emerald-700 dark:text-emerald-300">Vencimento</p><p className="text-lg font-semibold tabular-nums text-emerald-800 dark:text-emerald-200">{fmt(r.vencimento)}</p></div>
-              <div className="rounded-lg bg-slate-50 p-3 dark:bg-slate-950"><p className="text-xs text-slate-500">Dias corridos</p><p className="text-lg font-semibold tabular-nums">{r.diasCorridos}</p></div>
+              <div className="rounded-lg bg-stone-50 p-3 dark:bg-stone-950"><p className="text-xs text-stone-500">Início da contagem</p><p className="text-lg font-semibold tabular-nums">{fmt(r.inicioContagem)}</p></div>
+              <div className="rounded-lg bg-clay-50 p-3 dark:bg-clay-950"><p className="text-xs text-clay-700 dark:text-clay-300">Vencimento</p><p className="text-lg font-semibold tabular-nums text-clay-800 dark:text-clay-200">{fmt(r.vencimento)}</p></div>
+              <div className="rounded-lg bg-stone-50 p-3 dark:bg-stone-950"><p className="text-xs text-stone-500">Dias corridos</p><p className="text-lg font-semibold tabular-nums">{r.diasCorridos}</p></div>
             </div>
             {r.ignorados.length > 0 && (
               <div><h3 className="mb-1 text-sm font-semibold">Dias não computados ({r.ignorados.length})</h3>
-                <ul className="grid max-h-56 gap-1 overflow-auto text-xs text-slate-600 sm:grid-cols-2 dark:text-slate-300">{r.ignorados.map((i) => <li key={i.data}><span className="font-mono">{fmt(i.data)}</span> — {i.motivo}</li>)}</ul>
+                <ul className="grid max-h-56 gap-1 overflow-auto text-xs text-stone-600 sm:grid-cols-2 dark:text-stone-300">{r.ignorados.map((i) => <li key={i.data}><span className="font-mono">{fmt(i.data)}</span> — {i.motivo}</li>)}</ul>
               </div>
             )}
             <Button variant="dark" onClick={() => salvarNaAgenda({ titulo: f.ato, data: r.vencimento, processo: f.processo, observacao: `Intimação em ${fmt(f.intimacao)}; ${f.dias} dias ${f.uteis ? "úteis" : "corridos"}.` })}><CalendarClock className="h-4 w-4" /> Salvar vencimento na agenda</Button>
           </div>
-        ) : <p className="text-sm text-slate-500">Informe a data da intimação e o prazo. O dia do começo é excluído e o do vencimento incluído (art. 224 do CPC).</p>}
+        ) : <p className="text-sm text-stone-500">Informe a data da intimação e o prazo. O dia do começo é excluído e o do vencimento incluído (art. 224 do CPC).</p>}
       </Card>
     </div>
   );

@@ -48,11 +48,11 @@ export default function Equipe() {
 
   const Unidades = ({ valor, onChange }: { valor: string[]; onChange(v: string[]): void }) => (
     <div className="flex flex-wrap gap-1.5">
-      {ativas.length === 0 && <span className="text-xs text-slate-500">Cadastre as lotações na aba Lotações.</span>}
+      {ativas.length === 0 && <span className="text-xs text-stone-500">Cadastre as lotações na aba Lotações.</span>}
       {ativas.map((u) => {
         const on = valor.includes(u.id);
         return <button key={u.id} type="button" aria-pressed={on} onClick={() => onChange(on ? valor.filter((x) => x !== u.id) : [...valor, u.id])}
-          className={`rounded-full border px-2.5 py-1 text-xs ${on ? "border-emerald-500 bg-emerald-50 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200" : "border-slate-300 text-slate-500 dark:border-slate-700"}`}>{u.nome}</button>;
+          className={`rounded-full border px-2.5 py-1 text-xs ${on ? "border-clay-500 bg-clay-50 text-clay-800 dark:bg-clay-950 dark:text-clay-200" : "border-stone-300 text-stone-500 dark:border-stone-700"}`}>{u.nome}</button>;
       })}
     </div>
   );
@@ -60,8 +60,8 @@ export default function Equipe() {
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-lg font-semibold text-slate-900 dark:text-white">Administração do Gabinete</h1>
-        <p className="text-sm text-slate-500">Controle de acessos, convites, lotações e avisos da equipe de {perfil?.gabineteNome}.</p>
+        <h1 className="text-lg font-semibold text-stone-900 dark:text-white">Administração do Gabinete</h1>
+        <p className="text-sm text-stone-500">Controle de acessos, convites, lotações e avisos da equipe de {perfil?.gabineteNome}.</p>
       </div>
       <Tabs value={aba} onChange={(a) => { setAba(a); setErro(null); setOk(null); }} tabs={[
         { value: "membros", label: <><Users className="h-4 w-4" /> Membros da equipe</>, count: membros.length },
@@ -73,8 +73,8 @@ export default function Equipe() {
 
       {aba === "membros" && (
         <div className="space-y-4">
-          <Card title="Convidar novo membro" icon={<UserPlus className="h-4 w-4 text-emerald-600" />} bodyClass="space-y-3 p-4">
-            <p className="text-sm text-slate-500">Digite o e-mail Google do assessor, estagiário ou juiz. O acesso é liberado automaticamente no primeiro login com esse e-mail.</p>
+          <Card title="Convidar novo membro" icon={<UserPlus className="h-4 w-4 text-clay-600" />} bodyClass="space-y-3 p-4">
+            <p className="text-sm text-stone-500">Digite o e-mail Google do assessor, estagiário ou juiz. O acesso é liberado automaticamente no primeiro login com esse e-mail.</p>
             <div className="grid gap-3 md:grid-cols-[minmax(0,2fr)_minmax(0,2fr)_minmax(0,1fr)]">
               <Field label="E-mail"><input type="email" className={inputCls} value={convite.email} onChange={(e) => setConvite({ ...convite, email: e.target.value })} placeholder="assessor@gmail.com" /></Field>
               <Field label="Nome (opcional)"><input className={inputCls} value={convite.nome} onChange={(e) => setConvite({ ...convite, nome: e.target.value })} /></Field>
@@ -88,7 +88,7 @@ export default function Equipe() {
             </Button>
           </Card>
 
-          <Card title="Membros vinculados" bodyClass="divide-y divide-slate-100 dark:divide-slate-800">
+          <Card title="Membros vinculados" bodyClass="divide-y divide-stone-100 dark:divide-stone-800">
             {membros.length === 0 && convites.length === 0 && <EmptyState icon={<Users className="h-6 w-6" />} title="Nenhum membro ainda">Convide a equipe pelo e-mail acima.</EmptyState>}
             {membros.map((m) => {
               const souEu = m.uid === perfil?.uid;
@@ -97,10 +97,10 @@ export default function Equipe() {
                 <div key={m.uid} className={`space-y-2 p-4 ${m.role === "juiz_titular" ? "bg-amber-50/50 dark:bg-amber-950/20" : ""}`}>
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div className="flex min-w-0 items-center gap-3">
-                      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-slate-200 text-sm font-bold text-slate-700 dark:bg-slate-800 dark:text-slate-200">{m.nome.slice(0, 1).toUpperCase()}</span>
+                      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-stone-200 text-sm font-bold text-stone-700 dark:bg-stone-800 dark:text-stone-200">{m.nome.slice(0, 1).toUpperCase()}</span>
                       <div className="min-w-0">
-                        <p className="flex flex-wrap items-center gap-1.5 font-medium text-slate-900 dark:text-slate-100">{m.nome} {souEu && <Badge tone="violet">Você</Badge>} <Badge tone={tomPapel(m.role)}>{ROLE_LABEL[m.role as Role] ?? m.role}</Badge> <Badge tone={m.ativo === false ? "red" : "green"}>{m.ativo === false ? "suspenso" : "ativo"}</Badge></p>
-                        <p className="truncate font-mono text-xs text-slate-500">{m.email}</p>
+                        <p className="flex flex-wrap items-center gap-1.5 font-medium text-stone-900 dark:text-stone-100">{m.nome} {souEu && <Badge tone="violet">Você</Badge>} <Badge tone={tomPapel(m.role)}>{ROLE_LABEL[m.role as Role] ?? m.role}</Badge> <Badge tone={m.ativo === false ? "red" : "green"}>{m.ativo === false ? "suspenso" : "ativo"}</Badge></p>
+                        <p className="truncate font-mono text-xs text-stone-500">{m.email}</p>
                       </div>
                     </div>
                     {podeMexer && (
@@ -113,9 +113,9 @@ export default function Equipe() {
                     )}
                   </div>
                   <div className="pl-12">
-                    <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-400">Unidades liberadas</p>
+                    <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-stone-400">Unidades liberadas</p>
                     {podeMexer ? <Unidades valor={m.unidadesLiberadas ?? []} onChange={(v) => agir(() => api.post(`/gabinete/equipe/${m.uid}`, { unidadesLiberadas: v }, "PATCH"))} />
-                      : <p className="text-xs text-slate-500">{m.unidadesLiberadas?.length ? m.unidadesLiberadas.map(nomeUnidade).join(" · ") : "Todas as unidades do gabinete"}</p>}
+                      : <p className="text-xs text-stone-500">{m.unidadesLiberadas?.length ? m.unidadesLiberadas.map(nomeUnidade).join(" · ") : "Todas as unidades do gabinete"}</p>}
                   </div>
                 </div>
               );
@@ -123,8 +123,8 @@ export default function Equipe() {
             {convites.map((c) => (
               <div key={c.email} className="flex flex-wrap items-center justify-between gap-3 p-4">
                 <div className="min-w-0">
-                  <p className="flex flex-wrap items-center gap-1.5 font-medium text-slate-900 dark:text-slate-100">{c.nome || c.email} <Badge tone="amber">convite pendente</Badge> <Badge tone={tomPapel(c.role)}>{ROLE_LABEL[c.role as Role] ?? c.role}</Badge></p>
-                  <p className="truncate font-mono text-xs text-slate-500">{c.email} · {c.unidadesLiberadas.length ? c.unidadesLiberadas.map(nomeUnidade).join(", ") : "todas as unidades"}</p>
+                  <p className="flex flex-wrap items-center gap-1.5 font-medium text-stone-900 dark:text-stone-100">{c.nome || c.email} <Badge tone="amber">convite pendente</Badge> <Badge tone={tomPapel(c.role)}>{ROLE_LABEL[c.role as Role] ?? c.role}</Badge></p>
+                  <p className="truncate font-mono text-xs text-stone-500">{c.email} · {c.unidadesLiberadas.length ? c.unidadesLiberadas.map(nomeUnidade).join(", ") : "todas as unidades"}</p>
                 </div>
                 <Button size="sm" variant="danger" onClick={() => agir(() => api.del(`/gabinete/convites/${encodeURIComponent(c.email)}`), "Convite revogado.")}><Trash2 className="h-3.5 w-3.5" /> Revogar</Button>
               </div>
@@ -135,10 +135,10 @@ export default function Equipe() {
 
       {aba === "lotacoes" && (
         <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,380px)]">
-          <Card title="Unidades judiciárias" bodyClass="divide-y divide-slate-100 dark:divide-slate-800">
+          <Card title="Unidades judiciárias" bodyClass="divide-y divide-stone-100 dark:divide-stone-800">
             {unidades.length ? unidades.map((u) => (
               <div key={u.id} className="flex flex-wrap items-center justify-between gap-3 p-4">
-                <div><p className="font-medium text-slate-900 dark:text-slate-100">{u.nome} {u.ativa === false && <Badge>inativa</Badge>}</p><p className="text-sm text-slate-500">Comarca de {u.comarca} · {u.competencia}</p></div>
+                <div><p className="font-medium text-stone-900 dark:text-stone-100">{u.nome} {u.ativa === false && <Badge>inativa</Badge>}</p><p className="text-sm text-stone-500">Comarca de {u.comarca} · {u.competencia}</p></div>
                 <Button size="sm" variant="ghost" onClick={() => agir(() => api.post(`/gabinete/unidades/${u.id}`, { ...u, ativa: u.ativa === false }, "PUT"))}>{u.ativa === false ? "Reativar" : "Desativar"}</Button>
               </div>
             )) : <EmptyState icon={<Building2 className="h-6 w-6" />} title="Nenhuma lotação cadastrada">Cadastre as varas e juizados em que o gabinete atua. A unidade escolhida no topo da tela orienta o rito e a competência das minutas.</EmptyState>}
@@ -154,7 +154,7 @@ export default function Equipe() {
 
       {aba === "aviso" && (
         <Card title="Aviso para a equipe do gabinete" bodyClass="space-y-3 p-4">
-          <p className="text-sm text-slate-500">Aparece no topo da tela de todos os membros do gabinete até ser desativado.</p>
+          <p className="text-sm text-stone-500">Aparece no topo da tela de todos os membros do gabinete até ser desativado.</p>
           <textarea rows={3} className={inputCls} value={aviso.texto} onChange={(e) => setAviso({ ...aviso, texto: e.target.value })} placeholder="Ex.: Mutirão de sentenças do JEC nesta semana — priorizar os conclusos há mais de 100 dias." />
           <Segmented label="Tipo de aviso" value={aviso.nivel} onChange={(n) => setAviso({ ...aviso, nivel: n })} options={[{ value: "info", label: "Informativo" }, { value: "alerta", label: "Alerta" }]} />
           <div className="flex flex-wrap gap-2">

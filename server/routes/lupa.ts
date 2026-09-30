@@ -33,8 +33,9 @@ lupaRouter.post("/auditar", requirePermission("lupa:auditar"), async (req, res) 
   const [diretriz, caderno] = await Promise.all([b.promptId ? repo().prompts.get(t, b.promptId) : Promise.resolve(null), repo().caderno.get(t)]);
   const { data, result } = await generateValidated(req.user!, "lupa", DiagnosticoAuditoria, {
     system: AUDITOR_SYSTEM,
-    messages: [{ role: "user", content: auditorUser(b.minuta, b.autos, schemaText(DiagnosticoAuditoria), alertas, { diretriz, caderno: caderno?.texto, pontoAtencao: b.pontoAtencao }) }],
-    temperature: 0,
+    documento: { rotulo: "autos", texto: b.autos },
+    messages: [{ role: "user", content: auditorUser(b.minuta, schemaText(DiagnosticoAuditoria), alertas, { diretriz, caderno: caderno?.texto, pontoAtencao: b.pontoAtencao }) }],
+    esforco: "high",
   });
 
   const numeroProcesso = b.numeroProcesso?.trim() || (b.autosIntegrais ?? b.autos).match(CNJ)?.[0] || b.minuta.match(CNJ)?.[0] || "n/i";

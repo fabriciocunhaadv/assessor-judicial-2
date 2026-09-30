@@ -35,8 +35,9 @@ export async function importarPrecedentes(user: AuthUser, texto: string, fonte: 
     try {
       const { data } = await generateValidated(user, "precedentes", LotePrecedentes, {
         system: PRECEDENTS_SYSTEM,
-        messages: [{ role: "user", content: `SCHEMA:\n${schema}\n\nDocumento: "${fonte}" — bloco ${i + 1} de ${blocos.length}.\n<trecho>\n${b}\n</trecho>` }],
-        temperature: 0,
+        documento: { rotulo: "trecho", texto: b },
+        messages: [{ role: "user", content: `Documento: "${fonte}" — bloco ${i + 1} de ${blocos.length} (trecho acima).\n\nSCHEMA:\n${schema}` }],
+        esforco: "medium",
       });
       return data.itens;
     } catch (err) {

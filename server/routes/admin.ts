@@ -64,20 +64,22 @@ adminRouter.get("/consumo", requirePermission("admin:custos"), async (req, res) 
   const q = z.object({ dias: z.coerce.number().min(1).max(365).default(30), tenantId: z.string().optional() }).parse(req.query);
   const logs = await repo().uso.listar(Date.now() - q.dias * 86_400_000, q.tenantId);
   const agrupar = (chave: (l: (typeof logs)[number]) => string) => {
-    const m = new Map<string, { chamadas: number; entrada: number; saida: number; usd: number; brl: number }>();
+    const m = new Map<string, { chamadas: number; entrada: number; saida: number; cacheLeitura: number; usd: number; brl: number }>();
     for (const l of logs) {
       const k = chave(l);
-      const a = m.get(k) ?? { chamadas: 0, entrada: 0, saida: 0, usd: 0, brl: 0 };
-      a.chamadas++; a.entrada += l.inputTokens; a.saida += l.outputTokens; a.usd += l.usd; a.brl = a.usd * env.usdBrl;
+      const a = m.get(k) ?? { chamadas: 0, entrada: 0, saida: 0, cacheLeitura: 0, usd: 0, brl: 0 };
+      a.chamadas++; a.entrada += l.inputTokens; a.saida += l.outputTokens; a.cacheLeitura += l.cacheLeitura ?? 0; a.usd += l.usd; a.brl = a.usd * env.usdBrl;
       m.set(k, a);
     }
     return Object.fromEntries(m);
   };
   const usd = logs.reduce((s, l) => s + l.usd, 0);
+  const economiaUsd = logs.reduce((s, l) => s + (l.economiaUsd ?? 0), 0);
+  const buscasWeb = logs.reduce((s, l) => s + (l.buscasWeb ?? 0), 0);
   res.json({
     periodoDias: q.dias,
     cotacaoUsdBrl: env.usdBrl,
-    total: { chamadas: logs.length, usd, brl: usd * env.usdBrl },
+    total: { chamadas: logs.length, usd, brl: usd * env.usdBrl, economiaCacheUsd: economiaUsd, economiaCacheBrl: economiaUsd * env.usdBrl, buscasWeb },
     porFuncionalidade: agrupar((l) => l.funcionalidade),
     porModelo: agrupar((l) => `${l.provider}/${l.model}`),
     porGabinete: agrupar((l) => l.tenantId),

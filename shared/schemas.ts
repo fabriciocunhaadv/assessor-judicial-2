@@ -53,7 +53,7 @@ export const Prova = z.object({
   local: Localizacao,
 });
 
-/** Saída da Etapa 1 — Assessor Fático (temperatura 0). */
+/** Saída da Etapa 1 — Assessor Fático. */
 export const DossieFatico = z.object({
   numeroProcesso: z.string().describe("Número CNJ literal ou 'n/i'. PROIBIDO completar dígitos."),
   classe: z.string(),

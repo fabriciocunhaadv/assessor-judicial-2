@@ -97,14 +97,19 @@ export function minutaToMarkdown(m: MinutaFinal): string {
 export async function gerarMinuta(user: AuthUser, input: MinutaInput): Promise<MinutaOutput> {
   const r = repo();
 
-  // ── ETAPA 1: Assessor Fático (temperatura 0.0) ──
+  // Resumo Executivo em paralelo com as duas etapas (não depende delas).
+  const resumoPromise = gerarResumoExecutivo(user, input.autos);
+  resumoPromise.catch(() => undefined); // evita rejeição não tratada se a Etapa 1 falhar antes do await
+
+  // ── ETAPA 1: Assessor Fático (esforço alto; autos como documento com cache para a retentativa) ──
   const s1Schema = schemaText(DossieFatico);
   const blocos = chunkText(input.autos, STAGE1_MAX_CHARS);
   const parciais = await mapLimit(blocos, 2, (bloco, i) =>
     generateValidated(user, "minuta", DossieFatico, {
       system: STAGE1_SYSTEM,
-      messages: [{ role: "user", content: (blocos.length > 1 ? `BLOCO ${i + 1} DE ${blocos.length} DOS AUTOS.\n\n` : "") + stage1User(bloco, s1Schema) }],
-      temperature: 0,
+      documento: { rotulo: "autos", texto: bloco },
+      messages: [{ role: "user", content: (blocos.length > 1 ? `BLOCO ${i + 1} DE ${blocos.length} DOS AUTOS.\n\n` : "") + stage1User(s1Schema) }],
+      esforco: "high",
     }),
   );
   const dossie = mergeDossies(parciais.map((p) => p.data));
@@ -143,7 +148,7 @@ export async function gerarMinuta(user: AuthUser, input: MinutaInput): Promise<M
   let etapa2 = await generateValidated(user, "minuta", MinutaFinal, {
     system,
     messages: [{ role: "user", content: stage2User(dossieJson, s2Schema) }],
-    temperature: 0.2,
+    esforco: "high",
   });
 
   // Piso de extensão: uma rodada de aprofundamento se a fundamentação vier telegráfica.
@@ -156,7 +161,7 @@ export async function gerarMinuta(user: AuthUser, input: MinutaInput): Promise<M
         { role: "assistant", content: JSON.stringify(etapa2.data) },
         { role: "user", content: `A fundamentação tem menos de ${MIN_PARAGRAFOS} parágrafos densos. Aprofunde os blocos B4, B5 e B6 com o confronto documento a documento e as transcrições literais do dossiê, sem acrescentar fatos novos. Devolva o JSON completo.` },
       ],
-      temperature: 0.2,
+      esforco: "high",
     });
   }
 
@@ -165,7 +170,7 @@ export async function gerarMinuta(user: AuthUser, input: MinutaInput): Promise<M
   const apreciados = new Set(minuta.pedidosApreciados.map((p) => p.pedidoId));
   const pedidosNaoApreciados = dossie.pedidos.filter((p) => !apreciados.has(p.id)).map((p) => `${p.id} — ${p.litisconsorte}: ${p.descricao}`);
 
-  const resumoExecutivo = await gerarResumoExecutivo(user, input.autos);
+  const resumoExecutivo = await resumoPromise;
   const id = randomUUID();
   const out: MinutaOutput = {
     id,

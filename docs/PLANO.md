@@ -23,7 +23,7 @@ Legenda: ✅ entregue nesta base · ⏭ próxima fase
 - ⏭ Detecção automática de Mov./Arq. pelos marcadores de cada tribunal.
 
 ## Fase 3 — Esteira em duas etapas (Módulo 1) ✅
-- Etapa 1 (Assessor Fático, temperatura 0) → dossiê JSON validado: cronologia, pedidos por litisconsorte, provas e fase processual.
+- Etapa 1 (Assessor Fático, Claude com esforço alto) → dossiê JSON validado: cronologia, pedidos por litisconsorte, provas e fase processual.
 - Autos acima de 900 mil caracteres: a Etapa 1 roda por blocos e os dossiês são fundidos sem juntar litisconsortes.
 - Etapa 2 (Juiz Revisor): 7 blocos, Minuta Paradigma, Caderno de Teses e precedentes relevantes selecionados por busca contextual.
 - Verificações após a geração: piso de 14 parágrafos densos (com uma rodada automática de aprofundamento), pedidos não apreciados e dados sem lastro nos autos.
@@ -87,7 +87,7 @@ O sistema anterior está em `legado/` (fora do build). Funcionalidades dele que 
 - Tour guiado interativo — `SystemTour.tsx` (o Manual já existe em /ajuda)
 - Guia do PROJUDI, calendário de prazos do gabinete, tickets de suporte e avisos globais
 - Gerenciador de prompts personalizados, histórico e comparação de versões de minutas, painel Fato × Prova, Raio-X do processo
-- Pesquisa legislativa com IA (o catálogo estático de regimes já existe), sincronização semanal automática de informativos e pesquisa ao vivo (grounding)
+- Sincronização semanal automática de informativos (a pesquisa ao vivo com o Claude já existe em Súmulas e em Legislação & Juros)
 - Base de conhecimento do gabinete, "Mapear PDFs" e varredura automática para sugerir teses
 - "Conheça o Assessor" e "Raio X da Lotação"
 - Extensão de navegador para importar autos

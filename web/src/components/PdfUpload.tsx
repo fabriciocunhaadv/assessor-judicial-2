@@ -28,7 +28,7 @@ export function PdfUpload() {
 
   return (
     <div className="space-y-2">
-      <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-300 p-6 text-center text-sm text-slate-600 hover:border-emerald-400 dark:border-slate-700 dark:text-slate-300">
+      <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-stone-300 p-6 text-center text-sm text-stone-600 hover:border-clay-400 dark:border-stone-700 dark:text-stone-300">
         <FileUp className="h-6 w-6" />
         {progresso ? (
           <span>Lendo página {progresso.p} de {progresso.t}…</span>
@@ -40,8 +40,8 @@ export function PdfUpload() {
         <input type="file" accept="application/pdf" className="hidden" onChange={(e) => onFile(e.target.files?.[0])} />
       </label>
       {progresso && (
-        <div className="h-1.5 w-full overflow-hidden rounded bg-slate-200 dark:bg-slate-800">
-          <div className="h-full bg-emerald-600 transition-all" style={{ width: `${(progresso.p / progresso.t) * 100}%` }} />
+        <div className="h-1.5 w-full overflow-hidden rounded bg-stone-200 dark:bg-stone-800">
+          <div className="h-full bg-clay-600 transition-all" style={{ width: `${(progresso.p / progresso.t) * 100}%` }} />
         </div>
       )}
       <ErrorBox erro={erro} />

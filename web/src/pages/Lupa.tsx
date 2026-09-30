@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { DiagnosticoAuditoria } from "@shared/schemas";
 import { cleanJudicialText } from "@shared/judicialTextCleaner";
 import { MarkdownLite } from "../components/MarkdownLite";
-import { Badge, Button, Card, EmptyState, ErrorBox, Field, inputCls, Notice, Segmented, Tabs } from "../components/ui";
+import { Badge, Button, Card, ClaudeTag, EmptyState, ErrorBox, Field, inputCls, Notice, Segmented, Tabs } from "../components/ui";
 import { api } from "../lib/api";
 import { useCaso } from "../lib/caso";
 import { useGabinete } from "../lib/gabinete";
@@ -23,8 +23,8 @@ export default function Lupa() {
       <div className="flex flex-wrap items-center gap-3">
         <div className="grid h-10 w-10 place-items-center rounded-lg bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300"><ShieldCheck className="h-5 w-5" /></div>
         <div>
-          <h1 className="flex items-center gap-2 text-lg font-semibold text-slate-900 dark:text-white">Lupa do Magistrado & Auditor de Minutas <Badge tone="amber">Função de ouro</Badge></h1>
-          <p className="text-sm text-slate-500">Conformidade fático-probatória, congruência de pedidos e registro das minutas auditadas.</p>
+          <h1 className="flex items-center gap-2 text-lg font-semibold text-stone-900 dark:text-white">Lupa do Magistrado & Auditor de Minutas <Badge tone="amber">Função de ouro</Badge></h1>
+          <p className="text-sm text-stone-500">Conformidade fático-probatória, congruência de pedidos e registro das minutas auditadas.</p>
         </div>
       </div>
       <Tabs value={aba} onChange={(a) => { setAba(a); setAberto(null); }} tabs={[
@@ -71,7 +71,7 @@ function Bancada() {
 
   return (
     <div className="grid gap-3 xl:h-[calc(100vh-15rem)] xl:grid-cols-3">
-      <Card title="1 · Autos" className="flex min-h-0 flex-col" bodyClass="flex min-h-0 flex-1 flex-col gap-2 p-3" actions={<div className="relative"><Search className="absolute left-2 top-2 h-4 w-4 text-slate-400" /><input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar nos autos" className="w-44 rounded-md border border-slate-300 bg-transparent py-1 pl-7 pr-2 text-sm dark:border-slate-700" /></div>}>
+      <Card title="1 · Autos" className="flex min-h-0 flex-col" bodyClass="flex min-h-0 flex-1 flex-col gap-2 p-3" actions={<div className="relative"><Search className="absolute left-2 top-2 h-4 w-4 text-stone-400" /><input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar nos autos" className="w-44 rounded-md border border-stone-300 bg-transparent py-1 pl-7 pr-2 text-sm dark:border-stone-700" /></div>}>
         {ocorrencias.length > 0 && (
           <ul className="max-h-36 space-y-1 overflow-auto text-xs">
             {ocorrencias.map((o, i) => <li key={i}><button type="button" onClick={() => setPagina(o.pag)} className="text-left hover:underline"><Badge>Pág. {o.pag}</Badge> …{o.trecho}…</button></li>)}
@@ -85,9 +85,9 @@ function Bancada() {
         <textarea value={caso.minuta} onChange={(e) => atualizar({ minuta: e.target.value })} placeholder="Cole a minuta a conferir ou gere uma em Nova Análise." className={`${inputCls} min-h-[60vh] flex-1 font-serif`} />
         <ErrorBox erro={erro} />
       </Card>
-      <Card title="3 · Diagnóstico e gabarito" className="flex min-h-0 flex-col" bodyClass="min-h-0 flex-1 overflow-auto p-3" actions={r && <Badge tone={tomNota(r.diagnostico.nota)}>Nota {r.diagnostico.nota.toFixed(1)}</Badge>}>
+      <Card title="3 · Diagnóstico e gabarito" className="flex min-h-0 flex-col" bodyClass="min-h-0 flex-1 overflow-auto p-3" actions={r && <><ClaudeTag modelo={r.modelo}>Auditado pelo Claude</ClaudeTag><Badge tone={tomNota(r.diagnostico.nota)}>Nota {r.diagnostico.nota.toFixed(1)}</Badge></>}>
         {r ? <Diagnostico d={r.diagnostico} divergencias={r.divergenciasAutomaticas} usarGabarito={(t) => atualizar({ minuta: t })} />
-          : <p className="text-sm text-slate-500">A Matriz de Conformidade verifica adstrição (extra, ultra e citra petita), dados sem lastro nos autos, precedentes vinculantes e consectários. Cada auditoria fica salva em Processos auditados.</p>}
+          : <p className="text-sm text-stone-500">A Matriz de Conformidade verifica adstrição (extra, ultra e citra petita), dados sem lastro nos autos, precedentes vinculantes e consectários. Cada auditoria fica salva em Processos auditados.</p>}
       </Card>
     </div>
   );
@@ -151,11 +151,11 @@ function NovaAuditoria() {
         </Field>
         <div className="space-y-2">
           <div className="flex items-center justify-between gap-2">
-            <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">2. Autos do processo</span>
+            <span className="text-xs font-semibold uppercase tracking-wide text-stone-500">2. Autos do processo</span>
             <Segmented label="Entrada dos autos" value={entrada} onChange={setEntrada} options={[{ value: "pdf", label: "PDF" }, { value: "texto", label: "Colar texto" }]} />
           </div>
           {entrada === "pdf" ? (
-            <label className="flex min-h-[15.5rem] cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-slate-300 p-4 text-center text-sm text-slate-600 hover:border-emerald-500 dark:border-slate-700 dark:text-slate-300">
+            <label className="flex min-h-[15.5rem] cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-stone-300 p-4 text-center text-sm text-stone-600 hover:border-clay-500 dark:border-stone-700 dark:text-stone-300">
               <FileUp className="h-6 w-6" />
               {progresso ?? (arquivo ? <span><strong>{arquivo}</strong> · {autos.length.toLocaleString("pt-BR")} caracteres. Clique para trocar.</span> : <span><strong>Clique ou arraste o PDF oficial dos autos</strong><br />Petições, contestação, réplica, certidões e provas.</span>)}
               <input type="file" accept="application/pdf" className="hidden" onChange={(e) => void lerPdf(e.target.files?.[0])} />
@@ -181,13 +181,13 @@ function Auditados({ abrir }: { abrir(r: Registro): void }) {
   const [erro, setErro] = useState<string | null>(null);
   useEffect(() => { api.get<Registro[]>("/lupa/auditorias").then(setItens).catch((e) => setErro(e.message)); }, []);
   return (
-    <Card bodyClass="divide-y divide-slate-100 dark:divide-slate-800">
+    <Card bodyClass="divide-y divide-stone-100 dark:divide-stone-800">
       <ErrorBox erro={erro} />
-      {itens === null ? <p className="p-4 text-sm text-slate-500">Carregando…</p> : itens.length === 0 ? (
+      {itens === null ? <p className="p-4 text-sm text-stone-500">Carregando…</p> : itens.length === 0 ? (
         <EmptyState icon={<ClipboardList className="h-6 w-6" />} title="Nenhum processo auditado">Cada auditoria feita na Bancada ou em Nova auditoria aparece aqui, com a nota e as pendências.</EmptyState>
       ) : itens.map((a) => (
-        <button key={a.id} type="button" onClick={() => abrir(a)} className="flex w-full flex-wrap items-center justify-between gap-3 p-4 text-left hover:bg-slate-50 dark:hover:bg-slate-800/50">
-          <span><span className="block font-mono text-sm font-medium text-slate-900 dark:text-slate-100">{a.numeroProcesso}</span><span className="text-xs text-slate-500">{a.assessorNome ? `${a.assessorNome} · ` : ""}{new Date(a.criadoEm).toLocaleString("pt-BR")}</span></span>
+        <button key={a.id} type="button" onClick={() => abrir(a)} className="flex w-full flex-wrap items-center justify-between gap-3 p-4 text-left hover:bg-stone-50 dark:hover:bg-stone-800/50">
+          <span><span className="block font-mono text-sm font-medium text-stone-900 dark:text-stone-100">{a.numeroProcesso}</span><span className="text-xs text-stone-500">{a.assessorNome ? `${a.assessorNome} · ` : ""}{new Date(a.criadoEm).toLocaleString("pt-BR")}</span></span>
           <span className="flex items-center gap-2"><Badge tone={a.pendencias ? "red" : "green"}>{a.pendencias} pendência(s)</Badge><Badge tone={tomNota(a.nota)}>Nota {a.nota.toFixed(1)}</Badge></span>
         </button>
       ))}
@@ -211,7 +211,7 @@ function Diagnostico({ d, divergencias, usarGabarito }: { d: DiagnosticoAuditori
       {aba === "gabarito" ? (
         <>
           {usarGabarito && <Button variant="ghost" size="sm" onClick={() => usarGabarito(d.minutaGabarito)}>Substituir a minuta pelo gabarito</Button>}
-          <MarkdownLite text={d.minutaGabarito} />
+          <div className="claude-output space-y-2"><ClaudeTag>Gabarito redigido pelo Claude</ClaudeTag><MarkdownLite text={d.minutaGabarito} /></div>
         </>
       ) : (
         <div className="space-y-3 text-sm">
@@ -231,8 +231,8 @@ function Diagnostico({ d, divergencias, usarGabarito }: { d: DiagnosticoAuditori
 function Secao({ titulo, itens, neutro }: { titulo: string; itens: string[]; neutro?: boolean }) {
   return (
     <div>
-      <h3 className="mb-1 flex items-center gap-2 font-semibold text-slate-800 dark:text-slate-100">{titulo} <Badge tone={itens.length ? (neutro ? "slate" : "red") : "green"}>{itens.length}</Badge></h3>
-      <ul className="list-disc space-y-1 pl-5 text-slate-700 dark:text-slate-300">{itens.map((i, k) => <li key={k}>{i}</li>)}</ul>
+      <h3 className="mb-1 flex items-center gap-2 font-semibold text-stone-800 dark:text-stone-100">{titulo} <Badge tone={itens.length ? (neutro ? "slate" : "red") : "green"}>{itens.length}</Badge></h3>
+      <ul className="list-disc space-y-1 pl-5 text-stone-700 dark:text-stone-300">{itens.map((i, k) => <li key={k}>{i}</li>)}</ul>
     </div>
   );
 }

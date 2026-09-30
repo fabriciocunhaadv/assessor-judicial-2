@@ -47,8 +47,8 @@ export default function GuiaProjudi() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-lg font-semibold text-slate-900 dark:text-white">Guia do PROJUDI</h1>
-          <p className="text-sm text-slate-500">Rotinas do gabinete no PROJUDI: movimentações, códigos, expedientes e passo a passo para a equipe.</p>
+          <h1 className="text-lg font-semibold text-stone-900 dark:text-white">Guia do PROJUDI</h1>
+          <p className="text-sm text-stone-500">Rotinas do gabinete no PROJUDI: movimentações, códigos, expedientes e passo a passo para a equipe.</p>
         </div>
         {podeEditar && <Segmented label="Modo" value={modo} onChange={setModo} options={[{ value: "ler", label: "Consultar" }, { value: "editar", label: "Editar" }]} />}
       </div>
@@ -57,7 +57,7 @@ export default function GuiaProjudi() {
 
       {modo === "editar" ? (
         <Card title="Editor do guia" bodyClass="space-y-3 p-4" actions={<Badge>{texto.length.toLocaleString("pt-BR")} caracteres</Badge>}>
-          <p className="text-xs text-slate-500">Separe cada rotina por uma linha em branco: cada bloco vira um resultado na busca.</p>
+          <p className="text-xs text-stone-500">Separe cada rotina por uma linha em branco: cada bloco vira um resultado na busca.</p>
           <textarea rows={22} className={`${inputCls} font-mono text-xs leading-relaxed`} value={texto} onChange={(e) => setTexto(e.target.value)}
             placeholder={"CONCLUSÃO PARA SENTENÇA\nMovimentar como “Conclusos para sentença” após certificar o decurso do prazo de réplica.\n\nJUNTADA DE AR NEGATIVO\n1. Certificar o resultado da diligência.\n2. Intimar a parte autora para indicar novo endereço em 5 dias."} />
           <div className="flex flex-wrap gap-2">
@@ -68,20 +68,20 @@ export default function GuiaProjudi() {
       ) : (
         <Card bodyClass="space-y-4 p-4">
           <div className="relative">
-            <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+            <Search className="absolute left-3 top-2.5 h-4 w-4 text-stone-400" />
             <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar rotina, movimento ou código (ex.: conclusão sentença, AR negativo)" className={`${inputCls} pl-9`} />
           </div>
           {salvo ? (
             <>
-              <p className="text-xs text-slate-500">{achadas.length} de {secoes.length} rotina(s){meta ? ` · atualizado em ${new Date(meta).toLocaleString("pt-BR")}` : ""}</p>
+              <p className="text-xs text-stone-500">{achadas.length} de {secoes.length} rotina(s){meta ? ` · atualizado em ${new Date(meta).toLocaleString("pt-BR")}` : ""}</p>
               <div className="space-y-3">
                 {achadas.map((s, i) => (
-                  <div key={i} className="group relative rounded-lg border border-slate-200 p-4 dark:border-slate-800">
-                    <button type="button" onClick={() => void navigator.clipboard.writeText(s).then(() => setOk("Rotina copiada."), () => {})} className="absolute right-2 top-2 rounded p-1 text-slate-400 opacity-0 hover:bg-slate-100 group-hover:opacity-100 focus:opacity-100 dark:hover:bg-slate-800" aria-label="Copiar rotina"><ClipboardCopy className="h-4 w-4" /></button>
-                    <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-800 dark:text-slate-200">{realce(s)}</p>
+                  <div key={i} className="group relative rounded-lg border border-stone-200 p-4 dark:border-stone-800">
+                    <button type="button" onClick={() => void navigator.clipboard.writeText(s).then(() => setOk("Rotina copiada."), () => {})} className="absolute right-2 top-2 rounded p-1 text-stone-400 opacity-0 hover:bg-stone-100 group-hover:opacity-100 focus:opacity-100 dark:hover:bg-stone-800" aria-label="Copiar rotina"><ClipboardCopy className="h-4 w-4" /></button>
+                    <p className="whitespace-pre-wrap text-sm leading-relaxed text-stone-800 dark:text-stone-200">{realce(s)}</p>
                   </div>
                 ))}
-                {achadas.length === 0 && <p className="py-6 text-center text-sm text-slate-500">Nenhuma rotina com esses termos.</p>}
+                {achadas.length === 0 && <p className="py-6 text-center text-sm text-stone-500">Nenhuma rotina com esses termos.</p>}
               </div>
             </>
           ) : (

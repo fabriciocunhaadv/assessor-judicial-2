@@ -16,6 +16,7 @@ G. Alertas: páginas ilegíveis, divergência de valores/datas entre peças, doc
 
 SAÍDA: um único objeto JSON conforme o schema informado, sem comentários.`;
 
-export function stage1User(autos: string, schema: string): string {
-  return `SCHEMA JSON OBRIGATÓRIO:\n${schema}\n\n<autos>\n${autos}\n</autos>`;
+/** Os autos seguem como documento com cache (bloco <autos> no início da mensagem). */
+export function stage1User(schema: string): string {
+  return `Extraia o dossiê fático dos autos acima.\n\nSCHEMA JSON OBRIGATÓRIO:\n${schema}`;
 }

@@ -4,7 +4,7 @@ import type { AuthUser } from "../middleware/requireAuth.js";
 import { repo } from "../repositories/index.js";
 
 export async function registrarUso(user: AuthUser, funcionalidade: Funcionalidade, r: GenerateResult): Promise<void> {
-  const { usd, tabelado } = custoUsd(r.model, r.inputTokens, r.outputTokens);
+  const { usd, economiaUsd, tabelado } = custoUsd(r.model, r);
   try {
     await repo().uso.registrar({
       tenantId: user.tenantId,
@@ -14,7 +14,11 @@ export async function registrarUso(user: AuthUser, funcionalidade: Funcionalidad
       model: r.model,
       inputTokens: r.inputTokens,
       outputTokens: r.outputTokens,
+      cacheLeitura: r.cacheLeitura,
+      cacheEscrita: r.cacheEscrita,
+      buscasWeb: r.buscasWeb,
       usd,
+      economiaUsd,
       tabelado,
       em: Date.now(),
     });
