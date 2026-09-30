@@ -96,10 +96,15 @@
     const d = String(p.descricao || "").replace(/\s+/g, " ").trim();
     return `“${d.length > 70 ? d.slice(0, 67) + "…" : d}”`;
   }
+  /** Folha do PDF → "Mov. X, Arq. Y, Pág. Z" pelos carimbos dos autos anexados (senão, "fl. N"). */
+  function citacaoDaFolha(n) {
+    const l = L(S.caso.locais)[n - 1];
+    return l && l.mov ? `Mov. ${l.mov}, Arq. ${l.arq}, Pág. ${l.pag}` : `fl. ${n}`;
+  }
   function textoLegado(t) {
     return String(t)
       .replace(/\[(P\d+)\]/g, (m, id) => nomePedido(id) || m)
-      .replace(/⟦Pág\. (\d+)⟧/g, "fl. $1")
+      .replace(/⟦Pág\. (\d+)⟧/g, (m, n) => citacaoDaFolha(Number(n)))
       .replace(/⟦Mov\. (\d+) · Arq\. (\d+) · Pág\. (\d+)[^⟧]*⟧/g, "Mov. $1, Arq. $2, Pág. $3")
       .replace(/⟦PDF (\d+)⟧/g, "fl. $1");
   }
@@ -417,8 +422,25 @@
     clear($("#minuta-acts"), c.minuta ? [
       S.anterior != null ? h("button", { class: "btn quiet sm", type: "button", onclick: () => { const x = c.minuta; c.minuta = S.anterior; S.anterior = x; salvarHistorico(); render(); toast("Versão anterior restaurada."); }, text: "Desfazer" }) : null,
       h("button", { class: "btn quiet sm", type: "button", onclick: copiar, text: "Copiar" }),
+      h("button", { class: "btn quiet sm", type: "button", title: "Reescreve no padrão atual: lei transcrita, citações em bloco, Mov./Arq./Pág. e linguagem simples", disabled: !!S.ctl || !S.cap.sample, onclick: reformatarMinuta, text: "Reformatar" }),
       h("button", { class: "btn quiet sm", type: "button", onclick: (e) => exportar(e, baixarWord), text: "Word" }),
       h("button", { class: "btn quiet sm", type: "button", onclick: (e) => exportar(e, baixarPdf), text: "PDF" })] : []);
+  }
+  async function reformatarMinuta(e) {
+    const c = S.caso, b = e.currentTarget;
+    if (!S.cap.sample) return toast("Abra a página no claude.ai para usar o Claude.");
+    // Converte as folhas antigas antes de mandar ao Claude; com os autos anexados, vira Mov./Arq./Pág.
+    const base = String(c.minuta).replace(/⟦Pág\. (\d+)⟧/g, (m, n) => `(${citacaoDaFolha(Number(n))})`).replace(/⟦[^⟧]*⟧/g, "");
+    b.disabled = true; b.textContent = "Reformatando…"; S.ctl = new AbortController(); renderBotoes();
+    painel("p-minuta"); S.minAba = "texto";
+    try {
+      const r = await ask(P.reformatar(base, (c.resumo || "").slice(0, 60000)), { tier: "complex", signal: S.ctl.signal,
+        onText: ({ text }) => clear($("#min-view"), h("div", { class: "folha claude-out" }, md(text))) });
+      if (r.truncated) toast("A resposta foi cortada pelo limite: confira o final antes de usar.");
+      S.anterior = c.minuta; aplicarTexto(r.text); salvarHistorico();
+      toast("Minuta reformatada. Use Desfazer para voltar à anterior.");
+    } catch (x) { if (!(x && x.code === "cancelled")) showErr($("#gerar-err"), x); }
+    finally { S.ctl = null; render(); }
   }
   async function exportar(e, fn) {
     const b = e.currentTarget, rot = b.textContent; b.disabled = true; b.textContent = "Gerando…";
@@ -748,6 +770,7 @@
   // ───────── Renderização geral ─────────
   function renderBotoes() {
     const c = S.caso, ok = !!S.cap.sample, ocupado = !!S.ctl;
+    renderAcoes(); // Reformatar depende de estar livre
     $("#b-gerar").disabled = !ok || !c.autos || ocupado;
     const lidos = (c.lidos || []).filter(Boolean).length;
     $("#b-gerar").textContent = lidos && !ocupado ? `Continuar (${lidos} de ${c.lidos.length} blocos lidos)` : "Gerar minuta";
