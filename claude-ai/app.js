@@ -23,7 +23,7 @@
   const S = {
     caso: { nome: "", autos: "", paginas: 0, pdf: null, exemplo: false, dossie: null, resumo: "", minuta: "", numero: "" },
     teses: [], paradigmas: [], precedentes: [], historico: [],
-    prompts: [], unidades: [], cfg: {}, auditorias: [], eventos: [],
+    prompts: [], unidades: [], cfg: {}, auditorias: [], eventos: [], conhecimento: [], chamados: [],
     paradigmaId: "", promptId: "", unidadeId: "", tipoAto: "auto",
     diag: null, chat: [], ctl: null, pagina: 1, filtro: "TODOS",
     cap: { sample: null, db: null, user: null, downloads: null, uid: null, canEdit: false, canWrite: null },
@@ -36,7 +36,7 @@
   const lembrar = (k, v) => { try { localStorage.setItem(k, v); } catch (e) { /* sem armazenamento */ } };
 
   // ───────── Abas ─────────
-  const TABS = ["esteira", "lupa", "audiencia", "chat", "historico", "agenda", "gabinete", "precedentes", "prompts", "legislacao", "projudi", "equipe", "ajuda"];
+  const TABS = ["esteira", "lupa", "audiencia", "mutirao", "peticao", "chat", "historico", "agenda", "gabinete", "precedentes", "conhecimento", "prompts", "legislacao", "projudi", "equipe", "chamados", "conheca", "ajuda"];
   function abrirAba(id) {
     for (const t of TABS) {
       $("#t-" + t).setAttribute("aria-selected", String(t === id));
@@ -44,6 +44,7 @@
     }
     if (id === "lupa") renderLupa();
     if (id === "agenda") renderAgenda();
+    if (id === "chat") renderChat();
     window.scrollTo(0, 0);
   }
   TABS.forEach((t) => $("#t-" + t).addEventListener("click", () => abrirAba(t)));
@@ -148,7 +149,7 @@
 
   function novoCaso(dados) {
     S.caso = { nome: "", autos: "", paginas: 0, pdf: null, exemplo: false, dossie: null, resumo: "", minuta: "", numero: "", ...dados };
-    S.diag = null; S.chat = []; S.pagina = 1;
+    S.diag = null; S.chat = []; S.pagina = 1; S.minutaAnterior = null; resAba = "minuta"; cmp = { a: null, b: null };
     renderCaso();
   }
 
@@ -237,10 +238,17 @@
       const unidade = S.unidades.find((u) => u.id === S.unidadeId) || null;
       const tema = [...c.dossie.pedidos.map((p) => p.descricao), ...c.dossie.pontosControvertidos, c.dossie.classe].join(" ");
       const precedentes = AJ.rankPrecedentes(tema, S.precedentes);
-      const prompt = P.stage2({ dossie: c.dossie, paradigma, teses, precedentes, instrucao: $("#t-instrucao").value.trim(), tipoAto: c.tipoAto, promptArea, unidade, caderno: usarCaderno ? (S.cfg.caderno && S.cfg.caderno.texto) || "" : "" });
+      const bc = trechosConhecimento(tema);
+      const prompt = P.stage2({ dossie: c.dossie, paradigma, teses, precedentes, instrucao: $("#t-instrucao").value.trim(), tipoAto: c.tipoAto, promptArea, unidade, caderno: usarCaderno ? (S.cfg.caderno && S.cfg.caderno.texto) || "" : "", conhecimento: bc.texto });
       const out = $("#minuta");
       const r = await ask(prompt, { tier: "complex", signal, onText: ({ text }) => { setStep(2, "run", "redigindo"); clear(out, md(text)); } });
       c.minuta = r.text.trim();
+      c.fato = null; c.conf = c.conf || null;
+      c.meta = { tipoAto: { sentenca: "Sentença", decisao: "Decisão", despacho: "Despacho", embargos: "Embargos" }[c.tipoAto] + (S.tipoAto === "auto" ? " (auto-detectado)" : ""),
+        prompt: promptArea ? `${promptArea.titulo} · ${promptArea.area}` : "", unidade: unidade ? `${unidade.nome} — ${unidade.comarca}` : "",
+        paradigma: paradigma ? paradigma.titulo : "", caderno: !!(usarCaderno && S.cfg.caderno && S.cfg.caderno.texto), teses: teses.length,
+        conhecimento: bc.n, precedentes: precedentes.map((p) => `${p.tribunal} ${p.identificador}`), blocos: AJ.chunkText(c.autos, STAGE1_CHARS).length, instrucao: $("#t-instrucao").value.trim() };
+      pushVersao("Minuta gerada");
       setStep(2, "done", r.truncated ? "resposta cortada pelo limite" : "");
 
       etapa = 3; setStep(3, "run");
@@ -262,7 +270,7 @@
     const btn = $("#b-aprof"); if (btn) { btn.disabled = true; btn.textContent = "Aprofundando…"; }
     try {
       const r = await ask(P.aprofundar(c.minuta, c.resumo), { tier: "complex", signal: S.ctl.signal, onText: ({ text }) => clear($("#minuta"), md(text)) });
-      c.minuta = r.text.trim(); renderCaso(); salvarHistorico();
+      c.minuta = r.text.trim(); pushVersao("Fundamentação aprofundada"); renderCaso(); salvarHistorico();
     } catch (e) { showErr($("#gerar-err"), e); renderCaso(); }
     finally { S.ctl = null; }
   }
@@ -297,6 +305,7 @@
         h("button", { class: "btn quiet sm", type: "button", onclick: copiarMinuta, text: "Copiar" }),
         S.cap.downloads ? h("button", { class: "btn quiet sm", type: "button", onclick: () => baixar("html"), text: "Baixar para Word" }) : null,
         S.cap.downloads ? h("button", { class: "btn quiet sm", type: "button", onclick: () => baixar("md"), text: ".md" }) : null,
+        h("button", { class: "btn ghost sm", type: "button", onclick: () => abrirAba("chat"), text: "Conversar sobre a minuta" }),
         h("button", { class: "btn ghost sm", type: "button", onclick: () => abrirAba("lupa"), text: "Conferir na Lupa" }));
     }
 
@@ -318,8 +327,11 @@
       clear($("#check-actions"), piso && densos < piso && c.resumo ? h("button", { class: "btn quiet sm", id: "b-aprof", type: "button", onclick: aprofundar, text: "Aprofundar fundamentação" }) : null);
     } else pc.hidden = true;
 
+    if (c.minuta && S.cap.canEdit) acts.append(h("button", { class: "btn quiet sm", type: "button", title: "Selecione um trecho da minuta e clique", onclick: selecaoParaCaderno, text: "⚡ Seleção → Caderno" }));
+    renderRes(); renderPassos();
     renderBotoes();
     if (!$("#lupa").hidden) renderLupa();
+    if (!$("#chat").hidden) renderMinutaChat();
   }
 
   function renderBotoes() {
@@ -328,7 +340,7 @@
     $("#b-auditar").disabled = !ok || !$("#editor").value.trim() || !(c.autos || c.resumo) || ocupado;
     $("#b-painel").disabled = !ok || !(c.resumo || c.autos);
     $("#b-termo").disabled = !ok;
-    $("#b-enviar").disabled = !ok || !c.minuta || !c.resumo;
+    $("#b-enviar").disabled = !ok || !(c.minuta || c.autos) || ocupado;
   }
 
   const semMarcadores = (t) => t.replace(/\s?\[P\d+\]/g, "");
@@ -355,7 +367,7 @@
 
   // ───────── Lupa ─────────
   $("#editor").addEventListener("input", () => { S.caso.minuta = $("#editor").value; renderBotoes(); });
-  $("#editor").addEventListener("change", () => renderCaso());
+  $("#editor").addEventListener("change", () => { pushVersao("Edição manual"); renderCaso(); });
   $("#pg-prev").addEventListener("click", () => { S.pagina = Math.max(1, S.pagina - 1); renderPagina(); });
   $("#pg-next").addEventListener("click", () => { S.pagina = Math.min(S.caso.paginas || 1, S.pagina + 1); renderPagina(); });
   let buscaT;
@@ -458,7 +470,7 @@
     try {
       const r = await ask(P.gabarito(S.caso.minuta, autosParaIA(S.caso.minuta, S.diag), S.diag), { tier: "complex", signal: S.ctl.signal, onText: ({ text }) => clear(box, h("div", { class: "folha" }, md(text))) });
       const txt = r.text.trim();
-      clear(box, h("div", { class: "row" }, h("button", { class: "btn ghost sm", type: "button", onclick: () => { S.caso.minuta = txt; renderCaso(); toast("Minuta substituída pelo gabarito."); }, text: "Usar o gabarito como minuta" })), h("div", { class: "folha" }, md(txt)));
+      clear(box, h("div", { class: "row" }, h("button", { class: "btn ghost sm", type: "button", onclick: () => { S.caso.minuta = txt; pushVersao("Gabarito da Lupa"); renderCaso(); toast("Minuta substituída pelo gabarito."); }, text: "Usar o gabarito como minuta" })), h("div", { class: "folha" }, md(txt)));
     } catch (e) { showErr(box, e); btn.disabled = false; }
     finally { S.ctl = null; }
   }
@@ -491,36 +503,120 @@
     finally { renderBotoes(); }
   });
 
-  // ───────── Chat ─────────
+  // ───────── Chat com a minuta ─────────
+  // O Claude pode buscar e ler páginas dos autos (ferramentas da página) para reanalisar documentos.
   const tMsg = $("#t-msg");
+  const INI = "===MINUTA ATUALIZADA===", FIM = "===FIM DA MINUTA===";
   tMsg.addEventListener("keydown", (e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) enviarChat(); });
   $("#b-enviar").addEventListener("click", enviarChat);
+  $("#b-chat-parar").addEventListener("click", () => S.ctl && S.ctl.abort());
+  $("#b-chat-nova").addEventListener("click", () => { S.chat = []; renderChat(); tMsg.focus(); });
+  $("#chips").addEventListener("click", (e) => {
+    const b = e.target.closest("button[data-p]"); if (!b) return;
+    tMsg.value = b.dataset.p; tMsg.focus();
+    if (b.dataset.edit) tMsg.setSelectionRange(tMsg.value.length, tMsg.value.length);
+    else enviarChat();
+  });
+
+  function separar(texto) {
+    const i = texto.indexOf(INI);
+    if (i < 0) return { conversa: texto, minuta: "" };
+    const resto = texto.slice(i + INI.length), f = resto.indexOf(FIM);
+    return { conversa: texto.slice(0, i).trim(), minuta: (f >= 0 ? resto.slice(0, f) : resto).trim(), completa: f >= 0 };
+  }
+  function aplicarMinuta(txt) {
+    S.minutaAnterior = S.caso.minuta; S.caso.minuta = txt; pushVersao("Ajuste pelo chat");
+    renderCaso(); salvarHistorico(); renderChat(); toast("Minuta atualizada. Use “Desfazer” para voltar.");
+  }
+  function renderMinutaChat() {
+    const c = S.caso;
+    $("#chat-ctx").textContent = c.autos ? `Autos: ${c.paginas} pág.` : c.minuta ? "Sem os autos (só a minuta)" : "";
+    $("#chat-min-h").textContent = c.numero && c.numero !== "n/i" ? `Minuta atual · ${c.numero}` : "Minuta atual";
+    clear($("#chat-min-acts"),
+      S.minutaAnterior != null ? h("button", { class: "btn quiet sm", type: "button", onclick: () => { const x = S.caso.minuta; S.caso.minuta = S.minutaAnterior; S.minutaAnterior = null; renderCaso(); salvarHistorico(); renderChat(); toast("Alteração desfeita."); void x; }, text: "Desfazer" }) : null,
+      c.minuta ? h("button", { class: "btn quiet sm", type: "button", onclick: copiarMinuta, text: "Copiar" }) : null);
+    clear($("#chat-minuta"), c.minuta ? md(c.minuta) : h("div", { class: "placeholder" }, h("p", { text: "Nenhuma minuta ainda. Gere uma na Nova Análise ou abra uma do Histórico. Com os autos carregados, você já pode conversar sobre eles." })));
+  }
   function renderChat(streaming) {
     const box = $("#msgs");
-    if (!S.chat.length && !streaming) return clear(box, h("p", { class: "muted small", text: "Gere uma minuta na Esteira. Depois peça ajustes como “converta para improcedência” ou “aprecie a tutela de urgência”." }));
-    clear(box, S.chat.map((m) => m.role === "user" ? h("div", { class: "msg user", text: m.content }) : h("div", { class: "msg bot" },
-      h("div", { class: "folha" }, md(m.content)),
-      /##\s*Altera/i.test(m.content) ? h("button", { class: "btn ghost sm", type: "button", onclick: () => { S.caso.minuta = m.content.replace(/\n#{1,3}\s*Altera[çc][õo]es realizadas[\s\S]*$/i, "").trim(); renderCaso(); toast("Minuta atualizada."); }, text: "Aplicar como minuta atual" }) : null)),
-      streaming || null);
+    renderMinutaChat();
+    if (!S.chat.length && !streaming) return clear(box, h("p", { class: "muted small", text: "Pergunte qualquer coisa sobre a minuta ou os autos, ou use os atalhos abaixo. Quando o Claude propuser uma minuta alterada, você decide se aplica." }));
+    clear(box, S.chat.map((m, idx) => {
+      if (m.role === "user") return h("div", { class: "msg user", text: m.content });
+      const { conversa, minuta, completa } = separar(m.content);
+      return h("div", { class: "msg bot" },
+        h("span", { class: "claude-chip", text: "Claude" }),
+        h("div", { class: "folha" }, md(conversa || (minuta ? "Minuta atualizada abaixo." : ""))),
+        m.fontes && m.fontes.length ? h("p", { class: "tool-note", text: "Consultou nos autos: " + m.fontes.join("; ") }) : null,
+        minuta ? h("details", null, h("summary", { text: completa === false ? "Minuta proposta (resposta cortada — confira antes de aplicar)" : "Ver a minuta proposta" }), h("div", { class: "folha" }, md(minuta))) : null,
+        minuta ? h("div", { class: "acts" },
+          m.aplicada ? h("span", { class: "pill ok", text: "Aplicada" }) : h("button", { class: "btn sm", type: "button", onclick: () => { m.aplicada = true; aplicarMinuta(minuta); }, text: "Aplicar como minuta atual" })) : null);
+    }), streaming || null);
     box.scrollTop = box.scrollHeight;
   }
+
+  // Ferramentas que o Claude usa para ler os autos (dados pequenos por chamada).
+  function paginasDoTexto(autos) {
+    const pags = new Map(); let atual = 1;
+    for (const p of autos.split(/(⟦Pág\. \d+⟧)/)) { const m = /⟦Pág\. (\d+)⟧/.exec(p); if (m) atual = Number(m[1]); else pags.set(atual, (pags.get(atual) || "") + p); }
+    return pags;
+  }
+  function ferramentasAutos(fontes, nota) {
+    const c = S.caso, pags = paginasDoTexto(c.autos);
+    return [
+      { name: "buscar_nos_autos", description: "Procura um termo nos autos (nome de peça, pessoa, valor, 'Mov. 18', 'laudo'...). Retorna até 12 ocorrências com a página e um trecho. Use antes de ler páginas.",
+        inputSchema: { type: "object", properties: { termo: { type: "string", description: "Texto a procurar (mín. 3 letras)" } }, required: ["termo"] },
+        execute: ({ termo }) => {
+          const q = String(termo || "").trim(); if (q.length < 3) throw new Error("Informe ao menos 3 letras.");
+          nota(`buscando “${q}”…`);
+          const re = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi"), out = [];
+          for (const [n, t] of pags) { let m; re.lastIndex = 0; while ((m = re.exec(t)) && out.length < 12) out.push({ pagina: n, trecho: t.slice(Math.max(0, m.index - 160), m.index + q.length + 200).replace(/\s+/g, " ").trim() }); if (out.length >= 12) break; }
+          fontes.push(`busca “${q}”`);
+          return out.length ? out : "Nada encontrado. Tente outro termo.";
+        } },
+      { name: "ler_paginas", description: "Lê o texto integral de páginas dos autos (até 6 páginas por vez). Retorna a lista {pagina, texto}. Use para reanalisar um documento.",
+        inputSchema: { type: "object", properties: { inicio: { type: "integer", minimum: 1 }, fim: { type: "integer", minimum: 1 } }, required: ["inicio"] },
+        execute: ({ inicio, fim }) => {
+          const a = Math.max(1, Math.floor(Number(inicio) || 1)), b = Math.min(c.paginas || a, Math.max(a, Math.floor(Number(fim) || a)), a + 5);
+          nota(`lendo pág. ${a}${b > a ? "–" + b : ""}…`);
+          const out = []; let total = 0;
+          for (let n = a; n <= b; n++) { const t = (pags.get(n) || "").trim().slice(0, 30000 - total); total += t.length; out.push({ pagina: n, texto: t || "(página sem texto)" }); if (total >= 30000) break; }
+          fontes.push(`pág. ${a}${b > a ? "–" + b : ""}`);
+          return out;
+        } },
+    ];
+  }
+
   async function enviarChat() {
-    const msg = tMsg.value.trim();
+    const msg = tMsg.value.trim(), c = S.caso;
     if (!msg || $("#b-enviar").disabled) return;
     showErr($("#chat-err"), null);
     S.chat.push({ role: "user", content: msg }); tMsg.value = "";
-    const bolha = h("div", { class: "msg bot" }, h("p", { class: "muted small", text: "Pensando…" }));
+    const bolha = h("div", { class: "msg bot" }, h("span", { class: "claude-chip", text: "Claude" }), h("p", { class: "muted small", text: "Pensando…" }));
     renderChat(bolha);
-    $("#b-enviar").disabled = true;
-    // A minuta atual já carrega o estado; respostas antigas vão resumidas para caber na chamada.
-    const hist = S.chat.slice(-6).map((m) => (m.role === "assistant" && m.content.length > 3000 ? { role: "assistant", content: m.content.slice(0, 3000) + "\n[…resposta anterior abreviada; a minuta atual acima já reflete as alterações aceitas]" } : m));
-    const turns = [{ role: "user", content: P.chatRegras(S.caso.resumo, S.caso.minuta) }, ...hist];
+    S.ctl = new AbortController(); renderBotoes(); $("#b-chat-parar").hidden = false;
+    const fontes = [], nota = (t) => { const n = bolha.querySelector(".tool-note") || bolha.appendChild(h("p", { class: "tool-note" })); n.textContent = "Consultando os autos: " + t; };
+    const usarFerramentas = !!(c.autos && S.cap.tools);
+    // Sem ferramentas, os autos vão no texto quando cabem; senão, o resumo.
+    const autosTexto = !usarFerramentas && c.autos ? autosParaIA(c.minuta, c.resumo) : "";
+    const contexto = P.chat({ resumo: (c.resumo || "").slice(0, 60000), minuta: c.minuta, paginas: c.paginas, nomeAutos: c.nome, ferramentas: usarFerramentas, autosTexto: autosTexto === c.resumo ? "" : autosTexto });
+    // Histórico curto; respostas antigas com minuta vão abreviadas (a minuta atual já está no contexto).
+    let hist = S.chat.slice(-8).map((m) => ({ role: m.role, content: m.role === "assistant" ? (separar(m.content).conversa || "Propus uma minuta atualizada.").slice(0, 3000) : m.content }));
+    while (hist.length && hist[0].role !== "user") hist.shift();
+    hist[0] = { role: "user", content: contexto + "\n\n---\nMENSAGEM:\n" + hist[0].content };
+    const opts = { tier: "default", cache: false, signal: S.ctl.signal, onText: ({ text }) => { const { conversa, minuta } = separar(text); clear(bolha, h("span", { class: "claude-chip", text: "Claude" }), h("div", { class: "folha" }, md(conversa)), minuta ? h("p", { class: "muted small", text: "Redigindo a minuta atualizada…" }) : null); } };
     try {
-      const r = await ask(turns, { tier: "default", cache: false, onText: ({ text }) => clear(bolha, h("div", { class: "folha" }, md(text))) });
-      S.chat.push({ role: "assistant", content: r.text });
+      let r;
+      if (usarFerramentas) {
+        const { cache, ...semCache } = opts;
+        r = await S.cap.sample(hist, { modelTier: "default", signal: semCache.signal, onText: semCache.onText, tools: ferramentasAutos(fontes, nota) });
+      } else r = await ask(hist, opts);
+      S.chat.push({ role: "assistant", content: r.text, fontes });
       renderChat();
-    } catch (e) { S.chat.pop(); tMsg.value = msg; renderChat(); showErr($("#chat-err"), e); }
-    finally { renderBotoes(); }
+    } catch (e) {
+      if (e && e.code === "cancelled") { S.chat.push({ role: "assistant", content: (e.text || "") + "\n\n*(interrompido)*", fontes }); renderChat(); }
+      else { S.chat.pop(); tMsg.value = msg; renderChat(); showErr($("#chat-err"), e); }
+    } finally { S.ctl = null; $("#b-chat-parar").hidden = true; renderBotoes(); }
   }
 
   // ───────── Precedentes ─────────
@@ -685,7 +781,7 @@
     const box = $("#hist-list");
     if (!S.cap.db || !S.cap.uid) return clear(box, h("p", { class: "muted small", text: "O histórico fica disponível quando a página é aberta no claude.ai com sua conta." }));
     clear(box, S.historico.length ? S.historico.map((m) => h("div", { class: "item" },
-      h("div", { class: "row" }, h("span", null, h("strong", { text: m.numero }), " ", h("span", { class: "muted small", text: new Date(m.criadoEm).toLocaleString("pt-BR") })),
+      h("div", { class: "row" }, h("span", null, h("span", { class: "tag", text: m.peca ? "Peça" : "Minuta" }), " ", h("strong", { text: m.numero }), " ", h("span", { class: "muted small", text: new Date(m.criadoEm).toLocaleString("pt-BR") })),
         h("div", { class: "row" },
           h("button", { class: "btn sm ghost", type: "button", onclick: () => abrirHistorico(m), text: "Abrir" }),
           h("button", { class: "btn sm quiet", type: "button", onclick: async () => { try { await S.cap.db.collection("data/users/" + S.cap.uid).doc(m._id).delete(); } catch (e) { toast("Não foi possível excluir."); } }, text: "Excluir" }))),
@@ -693,9 +789,141 @@
       : [h("p", { class: "muted small", text: "Nenhuma minuta salva ainda. Cada minuta gerada a partir de autos reais é guardada aqui, visível só para você (os autos em si não são guardados)." })]);
   }
   function abrirHistorico(m) {
+    if (m.peca) { PT.peca = m.peca; PT.titulo = m.numero; PT.tipo = m.tipo || "inicial"; PT.analise = null; PT.aba = "peca"; PT.histId = m._id.replace(/^p-/, ""); renderPt(); return abrirAba("peticao"); }
     novoCaso({ nome: `${m.arquivo || "Minuta salva"} (sem os autos)`, minuta: m.minuta, resumo: m.resumo, numero: m.numero,
       dossie: m.pedidos && m.pedidos.length ? AJ.normalizarDossie({ numeroProcesso: m.numero, pedidos: m.pedidos }) : null, histId: m._id.replace(/^m-/, "") });
     abrirAba("esteira");
+  }
+
+  // ───────── Modo Simplificado / Avançado e guia rápido ─────────
+  function aplicarModo(m) {
+    document.body.classList.toggle("simples", m === "simples");
+    $("#seg-modo").querySelectorAll("button").forEach((b) => b.setAttribute("aria-checked", String(b.dataset.v === m)));
+    lembrar("aj.modo", m);
+  }
+  $("#seg-modo").addEventListener("click", (e) => { const b = e.target.closest("button[data-v]"); if (b) aplicarModo(b.dataset.v); });
+  try { aplicarModo(localStorage.getItem("aj.modo") || "simples"); } catch (e) { aplicarModo("simples"); }
+  function guiaRecolhida(v) {
+    $("#passos").hidden = v; $("#b-guia-fechar").textContent = v ? "Mostrar" : "Recolher";
+    lembrar("aj.guia", v ? "1" : "");
+  }
+  $("#b-guia-fechar").addEventListener("click", () => guiaRecolhida(!$("#passos").hidden));
+  try { guiaRecolhida(localStorage.getItem("aj.guia") === "1"); } catch (e) { /* */ }
+  function renderPassos() {
+    const c = S.caso, feito = { 1: !!c.autos, 2: !!c.autos && (!!S.promptId || S.tipoAto !== "auto"), 3: !!S.paradigmaId, 4: !!c.minuta };
+    $("#passos").querySelectorAll("li").forEach((li) => li.classList.toggle("feito", !!feito[li.dataset.p]));
+  }
+
+  // ───────── Versões da minuta ─────────
+  function pushVersao(origem) {
+    const c = S.caso; if (!c.minuta) return;
+    const v = c.versoes || (c.versoes = []);
+    if (v.length && v[v.length - 1].texto === c.minuta) return;
+    v.push({ em: Date.now(), origem, texto: c.minuta });
+    if (v.length > 20) v.shift();
+  }
+
+  // ───────── Abas do resultado ─────────
+  let resAba = "minuta", cmp = { a: null, b: null };
+  $("#res-tabs").addEventListener("click", (e) => { const b = e.target.closest("button[data-v]"); if (!b) return; resAba = b.dataset.v; renderRes(); });
+  const L = (v) => (Array.isArray(v) ? v : []);
+  function renderRes() {
+    const c = S.caso, view = $("#res-view");
+    $("#res-tabs").querySelectorAll("button").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.v === resAba)));
+    $("#n-versoes").textContent = c.versoes && c.versoes.length ? `(${c.versoes.length})` : "";
+    $("#minuta").hidden = resAba !== "minuta"; view.hidden = resAba === "minuta";
+    if (resAba === "minuta") return;
+    const vazio = (t) => clear(view, h("p", { class: "muted small", text: t }));
+    if (resAba === "linha") {
+      const cr = c.dossie ? L(c.dossie.cronologia) : [];
+      if (!cr.length) return vazio("A linha do tempo aparece depois da Etapa 1 (gere a minuta).");
+      return clear(view, h("ol", { class: "tl" }, cr.map((e) => h("li", null,
+        h("strong", { text: `${e.data || "s/d"} · ${String(e.tipo || "").replace(/_/g, " ")}` }), " ", h("span", { class: "ref", text: AJ.loc ? AJ.loc(e) : [e.mov && "Mov. " + e.mov, e.arq && "Arq. " + e.arq, e.pag && "Pág. " + e.pag].filter(Boolean).join(", ") }),
+        h("p", { style: "margin:2px 0 0", text: e.resumo || "" }),
+        L(e.transcricoes).filter(Boolean).map((q) => h("p", { class: "q", text: `“${q}”` }))))));
+    }
+    if (resAba === "fato") {
+      if (!c.dossie || !c.minuta) return vazio("Gere a minuta para montar a matriz de confronto Fato × Prova.");
+      const btn = h("button", { class: "btn sm", type: "button", disabled: !S.cap.sample || !!S.ctl, text: c.fato ? "Montar de novo" : "Montar matriz Fato × Prova", onclick: async () => {
+        btn.disabled = true; btn.textContent = "Montando…";
+        try { const d = await ask(P.fatoProva(c.dossie, c.minuta), { tier: "default", json: true }); c.fato = L(d && d.itens); renderRes(); }
+        catch (e) { showErr(err, e); btn.disabled = false; btn.textContent = "Tentar de novo"; } } });
+      const err = h("div");
+      return clear(view, h("div", { class: "row" }, btn, h("span", { class: "muted small", text: "Cada fato relevante com a prova, a análise, o fundamento e o impacto no julgamento." })), err,
+        c.fato ? h("div", { class: "items", style: "margin-top:10px" }, c.fato.map((i) => h("div", { class: "item" },
+          h("strong", { text: i.fato }),
+          h("p", { class: "small" }, h("strong", { text: "Prova: " }), i.prova || "—", i.localizacao ? [" ", h("span", { class: "ref", text: i.localizacao })] : null),
+          i.analise ? h("p", { class: "small" }, h("strong", { text: "Análise: " }), i.analise) : null,
+          i.fundamento ? h("p", { class: "small" }, h("strong", { text: "Fundamento: " }), i.fundamento) : null,
+          i.valoracao ? h("p", { class: "small" }, h("strong", { text: "Valoração: " }), i.valoracao) : null))) : null);
+    }
+    if (resAba === "conf") {
+      if (!c.autos && !c.resumo) return vazio("Carregue os autos para conferir competência, alçada, legitimidade, documentos e consectários.");
+      const err = h("div");
+      const btn = h("button", { class: "btn sm", type: "button", disabled: !S.cap.sample || !!S.ctl, text: c.conf ? "Conferir de novo" : "Conferir conformidade", onclick: async () => {
+        btn.disabled = true; btn.textContent = "Conferindo…";
+        try { const d = await ask(P.conformidade(autosParaIA(c.dossie), c.dossie), { tier: "default", json: true }); c.conf = { itens: L(d && d.itens), sintese: (d && d.sintese) || "" }; renderRes(); }
+        catch (e) { showErr(err, e); btn.disabled = false; btn.textContent = "Tentar de novo"; } } });
+      const ST = { ok: "✓ regular", alerta: "! conferir", falha: "✗ irregular", nao_aplicavel: "— não se aplica" };
+      const grupos = c.conf ? [...new Set(c.conf.itens.map((i) => i.grupo || "Geral"))] : [];
+      return clear(view, h("div", { class: "row" }, btn, h("span", { class: "muted small", text: "Alertas e pontos críticos do processo antes de decidir." })), err,
+        c.conf && c.conf.sintese ? h("div", { class: "info", style: "margin-top:10px", text: c.conf.sintese }) : null,
+        grupos.map((g) => h("div", { class: "sec", style: "margin-top:12px" }, h("h3", { text: g }),
+          h("div", { class: "checks" }, c.conf.itens.filter((i) => (i.grupo || "Geral") === g).map((i) => h("div", { class: "item" },
+            h("div", { class: "row" }, h("strong", { class: "small", text: i.requisito }), h("span", { class: "small st-" + i.status, text: ST[i.status] || i.status })),
+            i.observacao ? h("p", { class: "small muted", text: i.observacao + (i.localizacao ? ` (${i.localizacao})` : "") }) : null))))));
+    }
+    if (resAba === "raiox") {
+      const m = c.meta;
+      if (!m) return vazio("O Raio-X mostra o que o Claude usou para redigir: aparece depois de gerar a minuta.");
+      const { densos, nao, sem } = conferencia();
+      const linha = (rot, val) => h("div", { class: "check" }, h("span", { text: rot }), h("strong", { class: "small", text: val }));
+      return clear(view, h("div", { class: "checks" },
+        linha("Motor", "Claude (sua conta do claude.ai)"),
+        linha("Autos", `${c.paginas} página(s), ${c.autos.length.toLocaleString("pt-BR")} caracteres${m.blocos > 1 ? `, lidos em ${m.blocos} blocos` : ""}`),
+        linha("Tipo de ato", m.tipoAto), linha("Prompt da área", m.prompt || "Padrão do sistema"),
+        linha("Unidade", m.unidade || "—"), linha("Minuta Paradigma (espelho)", m.paradigma || "sem paradigma"),
+        linha("Caderno de Teses", m.caderno ? "aplicado" : "não aplicado"), linha("Teses avulsas aplicadas", String(m.teses)),
+        linha("Base de Conhecimento", m.conhecimento ? `${m.conhecimento} documento(s)` : "nenhum"),
+        linha("Precedentes injetados", m.precedentes.length ? String(m.precedentes.length) : "nenhum"),
+        linha("Pedidos no dossiê", String(c.dossie ? c.dossie.pedidos.length : 0)),
+        linha("Pedidos não apreciados", String(nao.length)), linha("Dados sem lastro nos autos", String(sem.length)), linha("Parágrafos densos", String(densos))),
+        m.precedentes.length ? h("div", { class: "sec", style: "margin-top:10px" }, h("h3", { text: "Precedentes enviados ao Claude" }), h("ul", { class: "list-ol" }, m.precedentes.map((p) => h("li", { class: "small", text: p })))) : null,
+        m.instrucao ? h("div", { class: "sec", style: "margin-top:10px" }, h("h3", { text: "Orientação do co-piloto" }), h("p", { class: "small", text: m.instrucao })) : null);
+    }
+    if (resAba === "versoes") {
+      const v = c.versoes || [];
+      if (!v.length) return vazio("Cada minuta gerada, aprofundada, ajustada pelo chat ou editada fica guardada aqui nesta sessão.");
+      if (cmp.a == null || cmp.a >= v.length) cmp.a = Math.max(0, v.length - 2);
+      if (cmp.b == null || cmp.b >= v.length) cmp.b = v.length - 1;
+      const rot = (x, i) => `v${i + 1} · ${x.origem} · ${new Date(x.em).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`;
+      const sel = (k) => { const e = h("select", { onchange: (ev) => { cmp[k] = Number(ev.target.value); renderRes(); } }, v.map((x, i) => h("option", { value: String(i), text: rot(x, i) }))); e.value = String(cmp[k]); return e; };
+      const pars = (t) => t.split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
+      const A = pars(v[cmp.a].texto), B = pars(v[cmp.b].texto), sa = new Set(A), sb = new Set(B);
+      const itens = v.map((x, i) => {
+        const restaurar = x.texto === c.minuta ? null : h("button", { class: "btn sm ghost", type: "button", text: "Restaurar",
+          onclick: () => { c.minuta = x.texto; pushVersao(`Restaurada (v${i + 1})`); renderCaso(); toast("Versão restaurada."); } });
+        return h("div", { class: "item" }, h("div", { class: "row" }, h("span", { class: "small", text: rot(x, i) + (x.texto === c.minuta ? " · atual" : "") }), restaurar));
+      }).reverse();
+      let comparar = null;
+      if (v.length > 1) {
+        const colA = h("div", { class: "col" }, A.map((p) => h("p", { class: sb.has(p) ? "" : "del", text: p })));
+        const colB = h("div", { class: "col" }, B.map((p) => h("p", { class: sa.has(p) ? "" : "add", text: p })));
+        comparar = h("div", { class: "sec", style: "margin-top:14px" }, h("h3", { text: "Comparar lado a lado" }),
+          h("div", { class: "grid g-2" }, sel("a"), sel("b")),
+          h("p", { class: "small muted", text: `${A.filter((p) => !sb.has(p)).length} parágrafo(s) só na esquerda (vermelho) · ${B.filter((p) => !sa.has(p)).length} só na direita (verde)` }),
+          h("div", { class: "cmp" }, colA, colB));
+      }
+      return clear(view, h("div", { class: "items" }, itens), comparar);
+    }
+  }
+
+  // Trecho selecionado da minuta → Caderno de Teses (só Juiz(a)/Editor).
+  async function selecaoParaCaderno() {
+    const sel = String(window.getSelection ? window.getSelection() : "").trim();
+    if (sel.length < 20) return toast("Selecione na minuta o trecho (ao menos uma frase) e clique de novo.");
+    const atual = (S.cfg.caderno && S.cfg.caderno.texto) || "";
+    if (await setCfg("caderno", { texto: (atual ? atual.trimEnd() + "\n\n" : "") + sel.slice(0, 8000) })) toast("Trecho injetado no Caderno de Teses.");
   }
 
   // ───────── Gravação genérica no banco do gabinete ─────────
@@ -731,7 +959,7 @@
     if (S.promptId && !ativos.some((x) => x.id === S.promptId)) S.promptId = "";
     const pa = ativos.find((x) => x.id === S.promptId);
     $("#prompt-ativo").textContent = pa ? pa.titulo : "Padrão do sistema";
-    for (const [id, vazio] of [["#s-prompt", "Padrão do sistema (sem instruções de área)"], ["#lupa-prompt", "Nenhuma"]]) {
+    for (const [id, vazio] of [["#s-prompt", "Padrão do sistema (sem instruções de área)"], ["#lupa-prompt", "Nenhuma"], ["#pt-prompt", "Nenhum"], ["#mu-prompt", "Sentença de instrução e julgamento (padrão)"]]) {
       const el = $(id), atual = id === "#s-prompt" ? S.promptId : el.value;
       clear(el, h("option", { value: "", text: vazio }), ativos.map((x) => h("option", { value: x.id, text: `${x.titulo} · ${x.area}` })));
       el.value = ativos.some((x) => x.id === atual) ? atual : "";
@@ -744,6 +972,7 @@
     const b = e.target.closest("button[data-v]"); if (!b) return;
     S.tipoAto = b.dataset.v;
     $("#seg-ato").querySelectorAll("button").forEach((x) => x.setAttribute("aria-checked", String(x === b)));
+    renderPassos();
   });
 
   function renderCfg() {
@@ -983,7 +1212,11 @@
     ["Nova Análise", "Envie os autos em PDF, escolha o prompt da área e o tipo de ato. A Etapa 1 extrai cronologia, pedidos de cada litisconsorte e provas com Mov./Arq./Pág.; a Etapa 2 redige a minuta. A conferência aponta pedidos não julgados e dados que não aparecem nos autos."],
     ["Auditoria Ouro (Lupa)", "Confira a minuta contra os autos antes da assinatura: extra, ultra e citra petita, alucinações, precedentes e consectários, com minuta gabarito. Cada auditoria fica em Processos auditados."],
     ["Mesa de Audiência", "Os 5 pilares da lide, perguntas sugeridas e o redator de termo ou de homologação de acordo."],
-    ["Chat & Refino", "Peça ajustes na minuta; o Claude recebe o Resumo Executivo e a minuta atual."],
+    ["Mutirão de Audiências", "Autos em PDF e a ata (ou anotações/transcrição da mídia) da audiência geram o termo e a sentença prontos, com o prompt de sentença escolhido."],
+    ["Petição & Defesa 360°", "Redator de peças para a advocacia (inicial, contestação, réplica, manifestação, recurso), com Matriz de impugnação do art. 341 do CPC, auditoria preventiva e conferência da jurisprudência citada."],
+    ["Base de Conhecimento", "Documentos de referência do gabinete; os trechos pertinentes ao tema entram na minuta e aparecem no Raio-X."],
+    ["Chamados & Recados", "Sugestões, erros, pedidos de tese ou prompt e recados entre a equipe e o(a) Juiz(a). O sino no topo mostra o que está pendente."],
+    ["Chat com a minuta", "Converse com o Claude sobre a minuta e os autos: resumo, reanálise de um documento (ele busca e lê as páginas dos autos), melhoria, ajuste, conferência de pedidos e revisão da linguagem. Minutas propostas só mudam quando você clica em Aplicar, e dá para desfazer."],
     ["Agenda", "Prazos, audiências e diligências do gabinete, com a calculadora de prazos em dias úteis do CPC."],
     ["Teses & Modelos", "Minutas Paradigma (⚡ Injetar no Prompt), Caderno de Teses em texto corrido e teses avulsas."],
     ["Súmulas & Precedentes", "Importe PDFs de informativos; os julgados pertinentes entram automaticamente nas minutas."],
@@ -993,6 +1226,8 @@
     ["Equipe & Lotações", "Unidades judiciárias, aviso à equipe e permissões. A equipe entra pelo botão Compartilhar do claude.ai."],
   ];
   const NOVIDADES = [
+    ["30/09/2026", "Todas as telas do sistema antigo: Mutirão de Audiências, Petição & Defesa 360°, Base de Conhecimento, Chamados & Recados com sino, Conheça o Assessor; na Nova Análise, linha do tempo, Fato × Prova, conformidade, Raio-X, versões com comparação lado a lado, modo simplificado/avançado, guia rápido e trecho selecionado para o Caderno."],
+    ["30/09/2026", "Chat com a minuta: conversa livre sobre a minuta e os autos, com atalhos (resumir, reanalisar documento, melhorar, conferir pedidos, revisar linguagem), leitura das páginas dos autos pelo Claude, aplicar e desfazer."],
     ["30/09/2026", "Todos os módulos do sistema nesta página: Agenda com prazos do CPC, Prompts por Área, Legislação & Juros, Guia do PROJUDI, Equipe & Lotações, Caderno de Teses em texto, tipo de ato, processos auditados e este Manual."],
     ["30/09/2026", "Layout igual ao do sistema principal e cores do Claude."],
     ["29/09/2026", "Primeira versão no claude.ai: minutas em 2 etapas, Lupa, audiência, chat, precedentes e histórico."],
@@ -1000,11 +1235,243 @@
   clear($("#man-mod"), MODULOS.map(([t, d]) => h("div", { class: "item" }, h("strong", { text: t }), h("p", { class: "small", text: d }))));
   clear($("#man-log"), NOVIDADES.map(([d, t]) => h("div", { class: "item" }, h("span", { class: "tag", text: d }), h("p", { class: "small", text: t }))));
 
+  // ───────── Base de Conhecimento ─────────
+  const BC_MAX = 200000; // o documento do banco aceita até 256 KiB
+  function renderConhecimento() {
+    $("#bc-h").textContent = `Documentos · ${S.conhecimento.length} (${S.conhecimento.filter((d) => d.ativo !== false).length} ativos)`;
+    $("#bc-add-l").hidden = !S.cap.canEdit;
+    clear($("#bc-list"), S.conhecimento.length ? S.conhecimento.map((d) => h("div", { class: "item" },
+      h("div", { class: "row" }, h("span", null, h("strong", { text: d.nome }), " ", h("span", { class: "muted small", text: `${d.paginas || "?"} pág. · ${(d.texto || "").length.toLocaleString("pt-BR")} caracteres` }), d.ativo === false ? h("span", { class: "muted small", text: " · inativo" }) : null),
+        h("div", { class: "row" },
+          h("button", { class: "btn sm quiet", type: "button", onclick: () => clear($("#bc-view"), h("div", { class: "panel", style: "margin-top:12px" }, h("header", null, h("h2", { text: d.nome }), h("button", { class: "btn sm quiet", type: "button", onclick: () => clear($("#bc-view")), text: "Fechar" })), h("div", { class: "body scroll" }, h("pre", { style: "white-space:pre-wrap;font:13px/1.55 var(--f-doc);margin:0", text: d.texto || "" })))), text: "Ver" }),
+          S.cap.canEdit ? h("button", { class: "btn sm quiet", type: "button", onclick: () => gravar("conhecimento", d.id, { ...d, ativo: d.ativo === false }, () => { d.ativo = d.ativo === false; renderConhecimento(); }), text: d.ativo === false ? "Ativar" : "Desativar" }) : null,
+          S.cap.canEdit ? h("button", { class: "btn sm quiet", type: "button", onclick: () => confirmar($("#bc-list"), `Remover “${d.nome}” da base?`, () => apagar("conhecimento", d.id, () => { S.conhecimento = S.conhecimento.filter((x) => x.id !== d.id); renderConhecimento(); })), text: "Remover" }) : null))))
+      : [h("p", { class: "muted small", text: "Nenhum documento. Anexe enunciados, manuais, cadernos de jurisprudência ou votos do juízo: os trechos pertinentes ao tema de cada processo entram na redação da minuta." })]);
+  }
+  $("#bc-add").addEventListener("change", async () => {
+    const files = [...$("#bc-add").files]; $("#bc-add").value = "";
+    const st = $("#bc-status");
+    for (const f of files) {
+      try {
+        clear(st, h("div", { class: "info", text: `Lendo ${f.name}…` }));
+        const r = await lerPdf(f, (n, t) => clear(st, h("div", { class: "info", text: `Lendo ${f.name}: página ${n} de ${t}` })));
+        r.doc.destroy && r.doc.destroy();
+        let texto = r.texto;
+        while (AJ.bytes(texto) > BC_MAX) texto = texto.slice(0, Math.floor(texto.length * 0.9));
+        const d = { nome: f.name, paginas: r.paginas, texto, ativo: true, criadoEm: Date.now(), truncado: texto.length < r.texto.length };
+        const id = novoId();
+        await gravar("conhecimento", id, d, () => { S.conhecimento.push({ ...d, id }); });
+        clear(st, h("div", { class: d.truncado ? "warnbox" : "info", text: `${f.name}: ${r.paginas} página(s) adicionada(s)${d.truncado ? " — texto cortado no limite de 200 mil bytes por documento; divida o PDF para incluir o restante" : ""}.` }));
+      } catch (e) { showErr(st, "Não foi possível ler " + f.name + ": " + (e.message || e)); }
+    }
+    renderConhecimento();
+  });
+  /** Trechos dos documentos ativos mais próximos do tema (até ~30 mil caracteres). */
+  function trechosConhecimento(tema) {
+    const ativos = S.conhecimento.filter((d) => d.ativo !== false && d.texto);
+    if (!ativos.length) return { texto: "", n: 0 };
+    const termos = [...new Set(String(tema).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").split(/[^a-z0-9]+/).filter((w) => w.length > 4))];
+    const cands = [];
+    for (const d of ativos) for (const par of d.texto.split(/\n\s*\n/)) {
+      if (par.length < 80) continue;
+      const norm = par.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+      const score = termos.reduce((n, t) => n + (norm.includes(t) ? 1 : 0), 0);
+      if (score >= 2) cands.push({ score, nome: d.nome, par: par.slice(0, 2500) });
+    }
+    cands.sort((a, b) => b.score - a.score);
+    let total = 0; const out = []; const usados = new Set();
+    for (const c of cands) { if (total + c.par.length > 30000) break; out.push(`[${c.nome}] ${c.par}`); total += c.par.length; usados.add(c.nome); }
+    return { texto: out.join("\n\n"), n: usados.size };
+  }
+
+  // ───────── Petição & Defesa 360° ─────────
+  const PT = { tipo: "inicial", docs: [], peca: "", analise: null, aba: "peca", titulo: "" };
+  const PRELIM = ["Inépcia da inicial", "Ilegitimidade passiva", "Falta de interesse de agir", "Incompetência", "Conexão / continência", "Prescrição", "Decadência", "Gratuidade indevida"];
+  clear($("#pt-area"), AREAS.map((a) => h("option", { value: a, text: a })));
+  clear($("#pt-prelim"), PRELIM.map((p) => h("label", { class: "row" }, h("input", { type: "checkbox", value: p }), p)));
+  $("#pt-tipo").addEventListener("click", (e) => {
+    const b = e.target.closest("button[data-v]"); if (!b) return;
+    PT.tipo = b.dataset.v;
+    $("#pt-tipo").querySelectorAll("button").forEach((x) => x.setAttribute("aria-checked", String(x === b)));
+    $("#pt-defesa").hidden = PT.tipo !== "contestacao";
+  });
+  $("#pt-docs").addEventListener("change", async () => {
+    const files = [...$("#pt-docs").files]; $("#pt-docs").value = "";
+    for (const f of files) {
+      try {
+        $("#pt-docs-t").textContent = `Lendo ${f.name}…`;
+        const r = await lerPdf(f, (n, t) => { $("#pt-docs-s").textContent = `Página ${n} de ${t}`; });
+        r.doc.destroy && r.doc.destroy();
+        PT.docs.push({ nome: f.name, paginas: r.paginas, texto: r.texto });
+      } catch (e) { showErr($("#pt-err"), "Não foi possível ler " + f.name); }
+    }
+    $("#pt-docs-t").textContent = "Anexar PDFs (autos, provas, documentos do cliente)"; $("#pt-docs-s").textContent = "O texto é lido aqui no navegador.";
+    renderPtDocs();
+  });
+  function renderPtDocs() {
+    clear($("#pt-docs-l"), PT.docs.map((d, i) => h("div", { class: "item" }, h("div", { class: "row" }, h("span", { class: "small", text: `${d.nome} · ${d.paginas} pág.` }), h("button", { class: "btn sm quiet", type: "button", onclick: () => { PT.docs.splice(i, 1); renderPtDocs(); }, text: "Remover" })))));
+    $("#pt-gerar").disabled = !S.cap.sample || !!S.ctl;
+  }
+  function docsTexto(limite) {
+    let out = "", resto = limite;
+    for (const d of PT.docs) { const t = `\n=== ${d.nome} ===\n${d.texto}`; out += t.slice(0, Math.max(0, resto)); resto -= t.length; if (resto <= 0) { out += "\n[… documentos cortados pelo limite de tamanho]"; break; } }
+    return out;
+  }
+  $("#pt-parar").addEventListener("click", () => S.ctl && S.ctl.abort());
+  $("#pt-gerar").addEventListener("click", async () => {
+    showErr($("#pt-err"), null);
+    const prompt = S.prompts.find((x) => x.id === $("#pt-prompt").value) || null;
+    const fatos = $("#pt-fatos").value.trim();
+    if (fatos.length < 30 && !PT.docs.length) return showErr($("#pt-err"), "Descreva os fatos ou anexe os documentos.");
+    const d = { tipo: PT.tipo, polo: ["contestacao"].includes(PT.tipo) ? "reu" : "autor", cliente: $("#pt-cliente").value.trim(), contra: $("#pt-contra").value.trim(), processo: $("#pt-proc").value.trim(), vara: $("#pt-vara").value.trim(), area: $("#pt-area").value, valor: $("#pt-valor").value.trim(),
+      tutela: $("#pt-tutela").checked, gratuidade: $("#pt-gratuidade").checked, concil: $("#pt-concil").checked, preliminares: [...$("#pt-prelim").querySelectorAll("input:checked")].map((x) => x.value), tempestividade: $("#pt-tempest").value.trim(),
+      prompt, extra: $("#pt-extra").value.trim(), fatos, precedentes: AJ.rankPrecedentes(fatos + " " + $("#pt-extra").value, S.precedentes).slice(0, 12) };
+    d.docs = docsTexto(Math.max(20000, 200000 - AJ.bytes(fatos) - AJ.bytes((prompt && prompt.texto) || "") - 15000));
+    PT.dados = d; PT.analise = null; PT.aba = "peca"; renderPt();
+    S.ctl = new AbortController(); $("#pt-gerar").disabled = true; $("#pt-parar").hidden = false;
+    try {
+      const r = await ask(P.peticao(d), { tier: "complex", signal: S.ctl.signal, onText: ({ text }) => { PT.peca = text; if (PT.aba === "peca") clear($("#pt-out"), md(text)); } });
+      PT.peca = r.text.trim(); PT.titulo = (PT.peca.match(/^#+\s*(.+)$/m) || [, "Peça"])[1].slice(0, 120);
+      renderPt(); salvarPeca();
+      clear($("#pt-err"), h("div", { class: "info", text: "Peça pronta. Conferindo requisitos do CPC, matriz e jurisprudência…" }));
+      const a = await ask(P.peticaoAnalise(d, PT.peca), { tier: "default", json: true, signal: S.ctl.signal });
+      PT.analise = a; showErr($("#pt-err"), null); renderPt();
+    } catch (e) { if (!(e && e.code === "cancelled")) showErr($("#pt-err"), e); if (e && e.text) { PT.peca = e.text; renderPt(); } }
+    finally { S.ctl = null; $("#pt-parar").hidden = true; renderPtDocs(); renderBotoes(); }
+  });
+  $("#pt-tabs").addEventListener("click", (e) => { const b = e.target.closest("button[data-v]"); if (b) { PT.aba = b.dataset.v; renderPt(); } });
+  function renderPt() {
+    $("#pt-tabs").querySelectorAll("button").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.v === PT.aba)));
+    $("#pt-h").textContent = PT.titulo || "Peça";
+    clear($("#pt-acts"), PT.peca ? [h("button", { class: "btn quiet sm", type: "button", onclick: async () => { try { await navigator.clipboard.writeText(PT.peca); toast("Peça copiada."); } catch (e) { toast("Não foi possível copiar."); } }, text: "Copiar" }),
+      S.cap.downloads ? h("button", { class: "btn quiet sm", type: "button", onclick: () => salvarArquivo(`peca-${PT.tipo}.html`, htmlWord(PT.peca, PT.titulo)), text: "Baixar para Word" }) : null] : []);
+    const out = $("#pt-out"), a = PT.analise || {};
+    if (PT.aba === "peca") return clear(out, PT.peca ? md(PT.peca) : h("div", { class: "placeholder" }, h("p", { text: "Escolha o tipo de peça, descreva os fatos ou anexe os documentos e clique em Redigir peça." }), h("p", { class: "small", text: "Na contestação, a Matriz do art. 341 do CPC confere se cada fato da inicial foi impugnado." })));
+    if (!PT.analise) return clear(out, h("p", { class: "muted small", text: PT.peca ? "A análise sai logo depois da peça." : "Gere a peça primeiro." }));
+    if (PT.aba === "matriz") {
+      const m = L(a.matriz341);
+      if (!m.length) return clear(out, h("p", { class: "muted small", text: PT.tipo === "contestacao" ? "Nenhuma alegação identificada. Anexe a petição inicial adversa." : "A matriz do art. 341 é gerada nas contestações." }));
+      return clear(out, h("p", { class: "small", text: `${m.length} alegação(ões) da inicial · ${m.filter((x) => x.impugnada === false).length} sem impugnação (risco de presunção de veracidade).` }),
+        h("div", { class: "items" }, m.map((x) => h("div", { class: "item" }, h("div", { class: "row" }, h("strong", { class: "small", text: x.alegacao }), h("span", { class: "pill " + (x.impugnada === false ? "bad" : "ok"), text: x.impugnada === false ? "não impugnada" : "impugnada" })),
+          x.localizacao ? h("span", { class: "ref", text: x.localizacao }) : null, x.impugnacao ? h("p", { class: "small", text: "Impugnação: " + x.impugnacao }) : null, x.prova ? h("p", { class: "small muted", text: "Prova: " + x.prova }) : null))));
+    }
+    if (PT.aba === "auditoria") {
+      const au = a.auditoria || {}, nota = Number(au.nota);
+      return clear(out, h("p", null, "Nota preventiva: ", h("span", { class: "pill " + (nota >= 80 ? "ok" : nota >= 60 ? "warn" : "bad"), text: Number.isFinite(nota) ? `${nota}/100` : "—" })),
+        h("div", { class: "checks" }, L(au.requisitos).map((r) => h("div", { class: "item" }, h("div", { class: "row" }, h("strong", { class: "small", text: r.requisito }), h("span", { class: "small st-" + r.status, text: { ok: "✓ ok", alerta: "! conferir", falha: "✗ falha" }[r.status] || r.status })), r.observacao ? h("p", { class: "small muted", text: r.observacao }) : null))));
+    }
+    if (PT.aba === "juris") {
+      const j = L(a.jurisprudencia);
+      if (!j.length) return clear(out, h("p", { class: "muted small", text: "Nenhuma jurisprudência citada." }));
+      return clear(out, h("div", { class: "items" }, j.map((x) => h("div", { class: "item" }, h("div", { class: "row" }, h("strong", { class: "small", text: x.citacao }), h("span", { class: "pill " + (x.verificado ? "ok" : "warn"), text: x.verificado ? "no repositório" : "sugestão de tese — conferir" })),
+        x.tese ? h("p", { class: "small", text: x.tese }) : null, x.uso ? h("p", { class: "small muted", text: x.uso }) : null))));
+    }
+  }
+  async function salvarPeca() {
+    if (!S.cap.db || !S.cap.uid || !PT.peca) return;
+    const id = PT.histId || (PT.histId = novoId());
+    try { await S.cap.db.collection("data/users/" + S.cap.uid).doc("p-" + id).set({ tipoDoc: "peca", tipo: PT.tipo, numero: PT.titulo || "Peça", arquivo: $("#pt-cliente").value.trim(), criadoEm: Date.now(), peca: PT.peca.slice(0, 150000) }); } catch (e) { /* conveniência */ }
+  }
+  function htmlWord(texto, titulo) {
+    const div = h("div"); div.append(md(texto));
+    div.querySelectorAll(".ref,.pid").forEach((r) => r.replaceWith(document.createTextNode(r.textContent)));
+    return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>${String(titulo || "documento").replace(/[<>&]/g, "")}</title><style>body{font:12pt/1.6 "Times New Roman",serif;max-width:17cm;margin:2cm auto}h1,h2{text-align:center;text-transform:uppercase;font-size:12pt}h3{font-size:12pt}p{text-align:justify;text-indent:2cm}p.cit{text-indent:0;margin-left:4cm;font-size:11pt}</style></head><body>${div.innerHTML}</body></html>`;
+  }
+  async function salvarArquivo(nome, dados) {
+    try { await S.cap.downloads.save({ filename: nome, data: dados }); } catch (e) { if (e && e.code !== "declined") toast("Não foi possível salvar o arquivo."); }
+  }
+
+  // ───────── Mutirão de Audiências ─────────
+  const MU = { autos: "", nome: "", termo: "", sent: "" };
+  $("#mu-pdf").addEventListener("change", async () => {
+    const f = $("#mu-pdf").files[0]; $("#mu-pdf").value = ""; if (!f) return;
+    try {
+      $("#mu-pdf-t").textContent = `Lendo ${f.name}…`;
+      const r = await lerPdf(f, (n, t) => { $("#mu-pdf-s").textContent = `Página ${n} de ${t}`; });
+      r.doc.destroy && r.doc.destroy();
+      MU.autos = r.texto; MU.nome = f.name; renderMu();
+    } catch (e) { showErr($("#mu-err"), "Não foi possível ler o PDF."); renderMu(); }
+  });
+  $("#mu-usar").addEventListener("click", () => { if (!S.caso.autos) return toast("Carregue os autos na Nova Análise primeiro."); MU.autos = S.caso.autos; MU.nome = S.caso.nome; renderMu(); });
+  $("#mu-ata-pdf").addEventListener("change", async () => {
+    const f = $("#mu-ata-pdf").files[0]; if (!f) return;
+    try { const r = await lerPdf(f, () => {}); r.doc.destroy && r.doc.destroy(); $("#mu-ata").value = r.texto.replace(/⟦Pág\. \d+⟧/g, "\n"); renderMu(); }
+    catch (e) { showErr($("#mu-err"), "Não foi possível ler a ata."); }
+  });
+  $("#mu-ata").addEventListener("input", () => renderMu());
+  function renderMu() {
+    $("#mu-pdf-t").textContent = MU.nome || "Toque ou arraste o PDF dos autos / inicial";
+    $("#mu-pdf-s").textContent = MU.autos ? `${MU.autos.length.toLocaleString("pt-BR")} caracteres após a limpeza` : "Lido e limpo aqui no navegador.";
+    $("#mu-gerar").disabled = !S.cap.sample || !MU.autos || $("#mu-ata").value.trim().length < 30 || !!S.ctl;
+    const acts = (id, txt, nome) => clear($(id), txt ? [h("button", { class: "btn quiet sm", type: "button", onclick: async () => { try { await navigator.clipboard.writeText(txt); toast("Copiado."); } catch (e) { toast("Não foi possível copiar."); } }, text: "Copiar" }),
+      S.cap.downloads ? h("button", { class: "btn quiet sm", type: "button", onclick: () => salvarArquivo(nome, htmlWord(txt, nome)), text: "Baixar para Word" }) : null] : []);
+    acts("#mu-termo-acts", MU.termo, "termo-audiencia.html"); acts("#mu-sent-acts", MU.sent, "sentenca-mutirao.html");
+  }
+  $("#mu-gerar").addEventListener("click", async () => {
+    showErr($("#mu-err"), null);
+    const ata = $("#mu-ata").value.trim().slice(0, 60000);
+    const lim = 180000 - AJ.bytes(ata);
+    const autos = AJ.bytes(MU.autos) <= lim ? MU.autos : MU.autos.slice(0, Math.floor(lim / 2)) + "\n\n[… trecho intermediário omitido pelo limite de tamanho …]\n\n" + MU.autos.slice(-Math.floor(lim / 2));
+    const prompt = S.prompts.find((x) => x.id === $("#mu-prompt").value) || null;
+    S.ctl = new AbortController(); renderMu();
+    try {
+      clear($("#mu-termo"), h("p", { class: "muted small", text: "Redigindo o termo…" }));
+      const t = await ask(P.mutiraoTermo(autos, ata), { tier: "default", signal: S.ctl.signal, onText: ({ text }) => clear($("#mu-termo"), md(text)) });
+      MU.termo = t.text.trim(); clear($("#mu-termo"), md(MU.termo)); renderMu();
+      clear($("#mu-sent"), h("p", { class: "muted small", text: "Redigindo a sentença…" }));
+      const s2 = await ask(P.mutiraoSentenca(autos, ata, prompt), { tier: "complex", signal: S.ctl.signal, onText: ({ text }) => clear($("#mu-sent"), md(text)) });
+      MU.sent = s2.text.trim(); clear($("#mu-sent"), md(MU.sent));
+    } catch (e) { if (!(e && e.code === "cancelled")) showErr($("#mu-err"), e); }
+    finally { S.ctl = null; renderMu(); renderBotoes(); }
+  });
+
+  // ───────── Chamados & Recados ─────────
+  function renderChamados() {
+    const f = $("#ch-filtro").value, meu = (c) => c.autor && c.autor === S.cap.uid;
+    const lista = S.chamados.filter((c) => f === "todos" || (f === "meus" ? meu(c) : c.status !== "fechado")).sort((a, b) => b.criadoEm - a.criadoEm);
+    $("#ch-h").textContent = `Chamados · ${S.chamados.filter((c) => c.status !== "fechado").length} aberto(s)`;
+    clear($("#ch-list"), lista.length ? lista.map((c) => {
+      const resp = h("textarea", { rows: "2", placeholder: "Responder…", maxlength: "3000" });
+      const podeResponder = S.cap.canEdit || meu(c);
+      return h("div", { class: "item" },
+        h("div", { class: "row" }, h("span", null, h("strong", { text: c.titulo }), " ", h("span", { class: "tag", text: c.categoria }), " ", h("span", { class: "small prio-" + c.prioridade, text: c.prioridade !== "normal" ? c.prioridade : "" })),
+          h("span", { class: "pill " + (c.status === "fechado" ? "" : c.status === "respondido" ? "ok" : "warn"), text: c.status })),
+        h("p", { class: "small", text: c.descricao }),
+        h("p", { class: "muted small", text: `${meu(c) ? "Você" : "Membro da equipe"} · ${new Date(c.criadoEm).toLocaleString("pt-BR")}` }),
+        L(c.respostas).map((r) => h("div", { class: "resp" + (r.admin ? " adm" : "") }, h("strong", { class: "small", text: r.autor === S.cap.uid ? "Você" : r.admin ? "Juiz(a) / gabinete" : "Membro da equipe" }), h("p", { style: "margin:2px 0", text: r.texto }))),
+        podeResponder && c.status !== "fechado" ? [resp, h("div", { class: "row" },
+          h("button", { class: "btn sm", type: "button", onclick: async () => { const t = resp.value.trim(); if (t.length < 2) return; await salvarChamado({ ...c, status: S.cap.canEdit && !meu(c) ? "respondido" : c.status, respostas: [...L(c.respostas), { autor: S.cap.uid, texto: t, em: Date.now(), admin: !!S.cap.canEdit }] }); }, text: "Responder" }),
+          S.cap.canEdit || meu(c) ? h("button", { class: "btn sm quiet", type: "button", onclick: () => salvarChamado({ ...c, status: "fechado" }), text: "Encerrar" }) : null)] : null);
+    }) : [h("p", { class: "muted small", text: "Nenhum chamado." })]);
+    renderSino();
+  }
+  function renderSino() {
+    const n = S.cap.canEdit ? S.chamados.filter((c) => c.status === "aberto").length : S.chamados.filter((c) => c.autor === S.cap.uid && c.status === "respondido").length;
+    $("#sino-n").hidden = !n; $("#sino-n").textContent = String(n);
+  }
+  async function salvarChamado(c) {
+    const { id, ...d } = c;
+    return gravar("chamados", id, d, () => { S.chamados = [...S.chamados.filter((x) => x.id !== id), c]; renderChamados(); });
+  }
+  $("#ch-filtro").addEventListener("change", renderChamados);
+  $("#b-sino").addEventListener("click", () => abrirAba("chamados"));
+  $("#ch-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const c = { id: novoId(), categoria: $("#ch-cat").value, prioridade: $("#ch-prio").value, titulo: $("#ch-tit").value.trim(), descricao: $("#ch-desc").value.trim(), status: "aberto", autor: S.cap.uid || "local", criadoEm: Date.now(), respostas: [] };
+    if (c.titulo.length < 3 || c.descricao.length < 5) return toast("Informe o assunto e a descrição.");
+    if (await salvarChamado(c)) { $("#ch-tit").value = ""; $("#ch-desc").value = ""; toast("Chamado aberto."); }
+  });
+
+  // Conheça o Assessor
+  $("#cn-iniciar").addEventListener("click", () => abrirAba("esteira"));
+  $("#cn-manual").addEventListener("click", () => abrirAba("ajuda"));
+
   // ───────── Capacidades do claude.ai ─────────
   function pill(id, txt, tom) { const el = $(id); el.textContent = txt; el.className = "pill " + (tom || ""); el.hidden = false; }
   async function iniciar() {
     renderFiltros(); renderPrecedentes(); renderParadigmas(); renderTeses(); renderHistorico(); renderCaso();
     renderPrompts(); renderRegimes(); renderUnidades(); renderAuditorias(); renderCfg(); renderContexto(); renderAgenda();
+    renderConhecimento(); renderPt(); renderPtDocs(); renderMu(); renderChamados();
     if (!window.claude || !window.claude.use) {
       pill("#st-claude", "Claude: abra esta página no claude.ai", "bad");
       pill("#st-db", "Dados do gabinete: indisponíveis fora do claude.ai", "warn");
@@ -1013,6 +1480,7 @@
     }
     const [sample, db, user, downloads] = await Promise.all(["sample", "db", "user", "downloads"].map((n) => window.claude.use(n).catch(() => null)));
     S.cap.sample = sample; S.cap.db = db; S.cap.user = user; S.cap.downloads = downloads;
+    if (sample && sample.limits) { try { S.cap.tools = !!(await sample.limits()).tools; } catch (e) { S.cap.tools = false; } }
     pill("#st-claude", sample ? "Claude: disponível" : "Claude: indisponível nesta visualização", sample ? "ok" : "bad");
 
     if (user) {
@@ -1027,7 +1495,7 @@
     $("#un-form").hidden = !S.cap.canEdit; $("#pj-edit").hidden = !S.cap.canEdit; $("#gcal-form").hidden = !S.cap.canEdit;
     $("#av-texto").hidden = $("#av-pub").hidden = $("#av-ret").hidden = !S.cap.canEdit; $("#av-ro").hidden = S.cap.canEdit;
     $("#cad-texto").readOnly = !S.cap.canEdit; $("#b-cad").hidden = !S.cap.canEdit;
-    renderPrompts(); renderUnidades(); renderProjudi();
+    renderPrompts(); renderUnidades(); renderProjudi(); renderConhecimento(); renderPtDocs(); renderMu(); renderChamados();
     $("#l-importar").hidden = S.cap.canWrite === false || !sample;
 
     if (db) {
@@ -1042,7 +1510,9 @@
       db.collection("config").onSnapshot((s) => { S.cfg = Object.fromEntries(s.docs.map((d) => [d.id, d.data()])); renderCfg(); }, falha);
       db.collection("auditorias").orderBy("criadoEm", "desc").limit(100).onSnapshot((s) => { S.auditorias = s.docs.map((d) => ({ ...d.data(), id: d.id })); renderAuditorias(); }, falha);
       db.collection("agenda").onSnapshot((s) => { S.eventos = s.docs.map((d) => ({ ...d.data(), id: d.id })); renderAgenda(); }, falha);
-      if (S.cap.uid) db.collection("data/users/" + S.cap.uid).orderBy("criadoEm", "desc").limit(50).onSnapshot((s) => { S.historico = s.docs.map((d) => ({ ...d.data(), _id: d.id })).filter((m) => m.minuta); renderHistorico(); }, () => {});
+      db.collection("conhecimento").onSnapshot((s) => { S.conhecimento = ordenar(s.docs.map((d) => ({ ...d.data(), id: d.id })), "nome"); renderConhecimento(); }, falha);
+      db.collection("chamados").orderBy("criadoEm", "desc").limit(200).onSnapshot((s) => { S.chamados = s.docs.map((d) => ({ ...d.data(), id: d.id })); renderChamados(); }, falha);
+      if (S.cap.uid) db.collection("data/users/" + S.cap.uid).orderBy("criadoEm", "desc").limit(50).onSnapshot((s) => { S.historico = s.docs.map((d) => ({ ...d.data(), _id: d.id })).filter((m) => m.minuta || m.peca); renderHistorico(); }, () => {});
       else renderHistorico();
     } else pill("#st-db", "Dados do gabinete: indisponíveis (só nesta sessão)", "warn");
     renderCaso();
