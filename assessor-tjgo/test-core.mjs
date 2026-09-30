@@ -23,4 +23,12 @@ t("secao", AJ.secao("## RELATÓRIO\na\n## FUNDAMENTAÇÃO\nb\n## DISPOSITIVO\nc"
 const pz = AJ.calcularPrazo("2025-12-18", 15);
 t("prazo CPC com recesso", pz.vencimento === "2026-02-09");
 t("prazo corrido", AJ.calcularPrazo("2026-03-02", 5, [], false).vencimento === "2026-03-09");
+const pgs = ["PROJUDI - Processo: 5001234-56.2025.8.09.0000 - Movimentação 1 - Arquivo 1 - Página 1 de 2\nPetição inicial.", "PROJUDI - Processo: 5001234-56.2025.8.09.0000 - Movimentação 1 - Arquivo 1 - Página 2 de 2\nPedidos.", "sem carimbo", "Processo 5001234 Mov. 18 Arq. 2\nContestação"];
+const dl = AJ.detectarLocais(pgs);
+t("carimbo PROJUDI", dl.locais[1].mov === "1" && dl.locais[1].pag === "2" && dl.locais[3].mov === "18" && dl.locais[3].arq === "2" && dl.locais[3].pag === "1");
+t("sem carimbo segue o arquivo", dl.locais[2].mov === "1" && dl.locais[2].pag === "3" && dl.locais[2].lido === false);
+const txtLoc = AJ.cleanPages(pgs, true, dl.locais);
+t("marcador triplo", txtLoc.includes("⟦Mov. 18 · Arq. 2 · Pág. 1 | PDF 4⟧"));
+const rod = AJ.detectarLocais(["Mov. 1 - Arq. 1\na\nPág. 1 de 3", "b\nPág. 2 de 3", "Mov. 18 - Arq. 1\nc\nPág. 3 de 3"]);
+t("rodapé do PDF não vira página do arquivo", rod.locais[2].pag === "1" && rod.locais[1].pag === "2");
 console.log(`${ok} ok, ${fail} falhas`);

@@ -80,17 +80,29 @@
   }
 
   // ───────── Markdown seguro, com referências clicáveis ─────────
-  const REF = /(⟦Pág\. \d+⟧|\b(?:Mov|Arq|Pág|Evento|fls?)\.?\s?\d+(?:[.-]\d+)?|\[P\d+\])/g;
+  // Marcadores de página no texto dos autos: ⟦Mov. X · Arq. Y · Pág. Z | PDF N⟧, ⟦PDF N⟧ ou ⟦Pág. N⟧ (antigo).
+  const MARCA = /⟦[^⟧]*⟧/g;
+  const pdfDoMarcador = (m) => { const x = /PDF (\d+)⟧|^⟦Pág\. (\d+)⟧$/.exec(m); return x ? Number(x[1] || x[2]) : null; };
+  const semMarcas = (t) => t.replace(MARCA, " ");
+  /** Página do PDF para uma citação "Mov. X, Arq. Y, Pág. Z" (ou "fl. N"), pelos carimbos lidos. */
+  function paginaDaCitacao(mov, arq, pag) {
+    const loc = L(S.caso.locais).find((l) => l.mov === String(mov) && l.arq === String(arq) && l.pag === String(pag));
+    return loc ? loc.pdf : null;
+  }
+  const REF = /(⟦[^⟧]*⟧|\bMov(?:\.|imentação)\s?\d+\s*[,;–-]?\s*Arq(?:\.|uivo)\s?\d+\s*[,;–-]?\s*Pág(?:\.|ina)?s?\s?\d+(?:\s?[-–]\s?\d+)?|\bfls?\.\s?\d+(?: dos autos digitais)?|\b(?:Mov|Arq|Pág|Evento)\.?\s?\d+(?:[.-]\d+)?|\[P\d+\])/g;
   function irParaPagina(n) { S.pagina = n; painel("p-autos"); renderPagina(); }
   function inlineRefs(text) {
     const out = [];
     for (const part of text.split(REF)) {
       if (!part) continue;
       REF.lastIndex = 0;
-      if (/^\[P\d+\]$/.test(part)) out.push(h("span", { class: "pid", text: part }));
+      if (/^\[P\d+\]$/.test(part)) continue; // códigos internos de pedido não aparecem
+      else if (/^⟦/.test(part)) continue; // marcador interno de página
       else if (REF.test(part)) {
-        const pag = /Pág\.?\s?(\d+)/.exec(part);
-        out.push(pag && S.caso.paginas ? h("button", { class: "ref", type: "button", title: "Abrir esta página dos autos", onclick: () => irParaPagina(Number(pag[1])), text: part.replace(/[⟦⟧]/g, "") }) : h("span", { class: "ref", text: part.replace(/[⟦⟧]/g, "") }));
+        REF.lastIndex = 0;
+        const tri = /Mov\D*(\d+)\D+?Arq\D*(\d+)\D+?(\d+)/.exec(part), fl = /^fls?\.\s?(\d+)/.exec(part);
+        const alvo = tri ? paginaDaCitacao(tri[1], tri[2], tri[3]) : fl ? Number(fl[1]) : null;
+        out.push(alvo && S.caso.paginas ? h("button", { class: "ref", type: "button", title: `Abrir nos autos (página ${alvo} do PDF)`, onclick: () => irParaPagina(alvo), text: part }) : h("span", { class: "ref", text: part }));
       } else out.push(part);
       REF.lastIndex = 0;
     }
@@ -132,7 +144,8 @@
       paginas.push(linhas.join("\n")); page.cleanup(); onProgress(n, doc.numPages);
       if (n % 4 === 0) await new Promise((r) => setTimeout(r, 0));
     }
-    return { doc, texto: AJ.cleanPages(paginas), paginas: doc.numPages };
+    const { locais, cobertura } = AJ.detectarLocais(paginas);
+    return { doc, texto: AJ.cleanPages(paginas, true, cobertura >= 0.3 ? locais : null), paginas: doc.numPages, locais: cobertura >= 0.3 ? locais : [], cobertura };
   }
   const drop = $("#drop"), fAutos = $("#f-autos");
   fAutos.addEventListener("change", () => { carregar(fAutos.files[0]); fAutos.value = ""; });
@@ -147,9 +160,10 @@
     try {
       const r = await lerPdf(file, (n, t) => { bar.firstElementChild.style.width = (100 * n / t) + "%"; $("#drop-s").textContent = `Página ${n} de ${t}`; });
       // Reabrindo do histórico: mantém a minuta e só acrescenta os autos.
-      if (S.caso.minuta && !S.caso.autos && S.caso.reaberto) Object.assign(S.caso, { nome: file.name, autos: r.texto, paginas: r.paginas, pdf: r.doc });
-      else novoCaso({ nome: file.name, autos: r.texto, paginas: r.paginas, pdf: r.doc });
-      if (r.texto.replace(/⟦Pág\. \d+⟧/g, "").trim().length < 300) showErr($("#gerar-err"), "Este PDF parece digitalizado sem texto (imagem). Aplique OCR antes de enviar.");
+      const dados = { nome: file.name, autos: r.texto, paginas: r.paginas, pdf: r.doc, locais: r.locais, cobertura: r.cobertura };
+      if (S.caso.minuta && !S.caso.autos && S.caso.reaberto) Object.assign(S.caso, dados);
+      else novoCaso(dados);
+      if (semMarcas(r.texto).trim().length < 300) showErr($("#gerar-err"), "Este PDF parece digitalizado sem texto (imagem). Aplique OCR antes de enviar.");
       S.pagina = 1; render();
     } catch (e) { showErr($("#gerar-err"), "Não foi possível ler o PDF: " + (e.message || e)); render(); }
     finally { bar.hidden = true; }
@@ -158,7 +172,8 @@
   $("#b-exemplo").addEventListener("click", () => {
     const hdr = "PODER JUDICIÁRIO DO ESTADO DE GOIÁS\nComarca de Exemplo — Juizado Especial Cível";
     const pags = EXEMPLO.map((c, i) => `${hdr}\n${c}\nDocumento assinado eletronicamente por SERVIDOR FICTÍCIO\nPág. ${i + 1} de ${EXEMPLO.length}`);
-    novoCaso({ nome: "Autos de exemplo (fictícios)", autos: AJ.cleanPages(pags), paginas: pags.length, exemplo: true });
+    const { locais, cobertura } = AJ.detectarLocais(pags);
+    novoCaso({ nome: "Autos de exemplo (fictícios)", autos: AJ.cleanPages(pags, true, locais), paginas: pags.length, exemplo: true, locais, cobertura });
     S.pagina = 1; render();
   });
 
@@ -170,10 +185,12 @@
   async function renderPagina() {
     const c = S.caso, box = $("#pdfbox");
     $("#pg-n").value = String(S.pagina); $("#pg-n").max = String(c.paginas || 1); $("#pg-total").textContent = `de ${c.paginas || "—"}`;
+    const loc = L(c.locais)[S.pagina - 1];
+    $("#pg-loc").textContent = loc && loc.mov ? `Mov. ${loc.mov} · Arq. ${loc.arq} · Pág. ${loc.pag}${loc.tot ? ` de ${loc.tot}` : ""}${loc.lido ? "" : " (estimada: página sem carimbo)"}` : "";
     if (!c.autos) return clear(box, h("p", { class: "muted small", style: "padding:20px", text: c.minuta ? "Minuta do histórico: anexe o PDF dos autos para vê-los aqui." : "Anexe os autos para vê-los aqui." }));
     if (!c.pdf) {
       let atual = 1, txt = "";
-      for (const p of c.autos.split(/(⟦Pág\. \d+⟧)/)) { const m = /⟦Pág\. (\d+)⟧/.exec(p); if (m) atual = Number(m[1]); else if (atual === S.pagina) txt += p; }
+      for (const p of c.autos.split(/(⟦[^⟧]*⟧)/)) { const n = /^⟦/.test(p) ? pdfDoMarcador(p) : null; if (n) atual = n; else if (atual === S.pagina) txt += p; }
       return clear(box, h("pre", { text: txt.trim() || "(página sem texto)" }));
     }
     if ($("#p-autos").offsetParent === null) return; // painel oculto: desenha quando abrir
@@ -195,9 +212,9 @@
     if (q.length < 3 || !c.autos) return clear(box);
     const re = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi"), hits = []; let m;
     while ((m = re.exec(c.autos)) && hits.length < 60) {
-      const antes = c.autos.lastIndexOf("⟦Pág.", m.index);
-      const pag = antes >= 0 ? Number(c.autos.slice(antes + 6, c.autos.indexOf("⟧", antes))) : 1;
-      const trecho = c.autos.slice(Math.max(0, m.index - 60), m.index + m[0].length + 80).replace(/⟦Pág\. \d+⟧/g, " ");
+      const antes = c.autos.lastIndexOf("⟦", m.index);
+      const pag = antes >= 0 ? pdfDoMarcador(c.autos.slice(antes, c.autos.indexOf("⟧", antes) + 1)) || 1 : 1;
+      const trecho = semMarcas(c.autos.slice(Math.max(0, m.index - 60), m.index + m[0].length + 80));
       const k = trecho.toLowerCase().indexOf(q.toLowerCase());
       hits.push(h("button", { type: "button", onclick: () => { S.pagina = pag; renderPagina(); } }, h("span", { class: "tag", text: "Pág. " + pag }), " …", trecho.slice(0, k), h("mark", { text: trecho.slice(k, k + q.length) }), trecho.slice(k + q.length), "…"));
     }
@@ -322,9 +339,9 @@
       painel("p-minuta"); S.minAba = "texto"; renderMinuta();
       const r = await ask(prompt, { tier: "complex", signal, onText: ({ text }) => {
         PROG.agora = `Redigindo: ${text.split(/\n\s*\n/).filter((x) => x.trim()).length} parágrafo(s) até agora…`;
-        clear($("#min-view"), h("div", { class: "folha claude-out" }, md(text)));
+        clear($("#min-view"), h("div", { class: "folha claude-out" }, md(limparMinuta(text).texto.replace(/\n=+\s*PEDIDOS[\s\S]*$/i, ""))));
       } });
-      c.minuta = r.text.trim();
+      c.apreciados = null; aplicarTexto(r.text);
       PROG.etapa = 3; PROG.agora = r.truncated ? "A resposta foi cortada pelo limite de tamanho: confira o final da minuta." : "Confira a aba Conferência antes de usar a minuta.";
       c.lidos = null; // leitura concluída: libera a memória
       salvarHistorico(); render();
@@ -340,17 +357,27 @@
     const c = S.caso; S.ctl = new AbortController(); renderBotoes();
     try {
       const r = await ask(P.aprofundar(c.minuta, c.resumo), { tier: "complex", signal: S.ctl.signal, onText: ({ text }) => clear($("#min-view"), h("div", { class: "folha claude-out" }, md(text))) });
-      S.anterior = c.minuta; c.minuta = r.text.trim(); salvarHistorico();
+      S.anterior = c.minuta; aplicarTexto(r.text); salvarHistorico();
     } catch (e) { showErr($("#gerar-err"), e); }
     finally { S.ctl = null; S.minAba = "texto"; render(); }
   }
 
   // ───────── Minuta ─────────
+  /** Retira a linha "===PEDIDOS APRECIADOS: P1, P2===" (e códigos [P#] que escaparem) e guarda os ids julgados. */
+  function limparMinuta(texto) {
+    let apreciados = null;
+    const t = String(texto).replace(/\n*=+\s*PEDIDOS APRECIADOS\s*:?\s*([^=\n]*)=*\s*$/i, (_, ids) => { apreciados = (ids.match(/P\d+/gi) || []).map((x) => x.toUpperCase()); return ""; });
+    return { texto: t.replace(/\s?\[P\d+\]/g, "").trim(), apreciados };
+  }
+  function aplicarTexto(texto) {
+    const { texto: t, apreciados } = limparMinuta(texto);
+    S.caso.minuta = t; if (apreciados) S.caso.apreciados = apreciados;
+  }
   $("#min-tabs").addEventListener("click", (e) => { const b = e.target.closest("button[data-v]"); if (!b) return; S.minAba = b.dataset.v; renderMinuta(); });
   $("#editor").addEventListener("change", () => { if ($("#editor").value !== S.caso.minuta) { S.anterior = S.caso.minuta; S.caso.minuta = $("#editor").value; salvarHistorico(); renderAcoes(); renderBotoes(); } });
   function conferencia() {
     const c = S.caso, fund = AJ.secao(c.minuta, "FUNDAMENTA", "DISPOSITIVO");
-    return { densos: AJ.paragrafosDensos(fund || c.minuta), nao: c.dossie ? AJ.pedidosNaoApreciados(c.dossie, c.minuta) : [], sem: c.autos ? AJ.verificarFidelidade(c.minuta, c.autos) : [] };
+    return { densos: AJ.paragrafosDensos(fund || c.minuta), nao: !c.dossie ? [] : c.apreciados ? c.dossie.pedidos.filter((p) => !c.apreciados.includes(p.id)) : AJ.pedidosNaoApreciados(c.dossie, c.minuta), sem: c.autos ? AJ.verificarFidelidade(c.minuta, c.autos) : [] };
   }
   function renderMinuta() {
     const c = S.caso, view = $("#min-view"), ed = $("#editor");
@@ -418,13 +445,13 @@
         L(m.fontes).length ? h("p", { class: "tool-note", text: "Consultou nos autos: " + m.fontes.join("; ") }) : null,
         minuta ? h("details", null, h("summary", { text: completa === false ? "Minuta proposta (cortada — confira antes de aplicar)" : "Ver a minuta proposta" }), h("div", { class: "folha" }, md(minuta))) : null,
         minuta ? h("div", { class: "row", style: "margin-top:8px" }, m.aplicada ? h("span", { class: "pill ok", text: "Aplicada" })
-          : h("button", { class: "btn sm", type: "button", onclick: () => { m.aplicada = true; S.anterior = S.caso.minuta; S.caso.minuta = minuta; salvarHistorico(); S.minAba = "texto"; render(); toast("Minuta atualizada. Use Desfazer para voltar."); }, text: "Aplicar na minuta" })) : null);
+          : h("button", { class: "btn sm", type: "button", onclick: () => { m.aplicada = true; S.anterior = S.caso.minuta; aplicarTexto(minuta); salvarHistorico(); S.minAba = "texto"; render(); toast("Minuta atualizada. Use Desfazer para voltar."); }, text: "Aplicar na minuta" })) : null);
     }), bolha || null);
     const sc = box.parentElement; sc.scrollTop = sc.scrollHeight;
   }
   function paginasDoTexto(autos) {
     const pags = new Map(); let atual = 1;
-    for (const p of autos.split(/(⟦Pág\. \d+⟧)/)) { const m = /⟦Pág\. (\d+)⟧/.exec(p); if (m) atual = Number(m[1]); else pags.set(atual, (pags.get(atual) || "") + p); }
+    for (const p of autos.split(/(⟦[^⟧]*⟧)/)) { const n = /^⟦/.test(p) ? pdfDoMarcador(p) : null; if (n) { atual = n; pags.set(atual, (pags.get(atual) || "") + p + " "); } else pags.set(atual, (pags.get(atual) || "") + p); }
     return pags;
   }
   function ferramentas(fontes, nota) {
@@ -609,7 +636,8 @@
     const c = S.caso;
     if (c.autos) {
       $("#drop-t").textContent = c.nome;
-      $("#drop-s").textContent = `${c.paginas} página(s) · ${c.autos.length.toLocaleString("pt-BR")} caracteres após a limpeza${c.exemplo ? " · fictícios" : ""}`;
+      const cob = c.cobertura == null ? "" : c.cobertura >= 0.3 ? ` · Mov./Arq. lidos em ${Math.round(c.cobertura * 100)}% das páginas` : " · carimbos Mov./Arq. não encontrados: citações pela folha do PDF";
+      $("#drop-s").textContent = `${c.paginas} página(s)${cob}${c.exemplo ? " · fictícios" : ""}`;
     } else if (!c.minuta) { $("#drop-t").textContent = "Anexar os autos em PDF"; $("#drop-s").textContent = "PROJUDI, PJe ou eproc · lidos aqui no navegador"; }
     renderMinuta(); renderAcoes(); renderChat(); renderPagina(); renderBusca(); renderBotoes();
   }
