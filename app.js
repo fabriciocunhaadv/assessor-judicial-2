@@ -26,7 +26,7 @@
 
   // ───────── Estado ─────────
   const S = {
-    caso: null, prompts: [], historico: [], chat: [], ctl: null, pagina: 1, tipoAto: "auto", promptId: lido("tj.prompt"),
+    caso: null, prompts: [], teses: [], historico: [], chat: [], ctl: null, pagina: 1, tipoAto: "auto", promptId: lido("tj.prompt"),
     minAba: "texto", anterior: null,
     cap: { sample: null, db: null, user: null, downloads: null, uid: null, tools: false },
   };
@@ -34,7 +34,7 @@
   S.caso = casoVazio();
 
   // ───────── Navegação ─────────
-  const TELAS = ["processo", "prompts", "historico"];
+  const TELAS = ["processo", "prompts", "teses", "historico"];
   function abrir(id) {
     for (const t of TELAS) { $("#t-" + t).setAttribute("aria-selected", String(t === id)); $("#" + t).hidden = t !== id; }
     window.scrollTo(0, 0);
@@ -377,7 +377,8 @@
       const sugerido = { despacho: "despacho", decisao_interlocutoria: "decisao", saneamento: "decisao", sentenca: "sentenca", embargos_declaracao: "embargos" };
       c.tipoAto = S.tipoAto !== "auto" ? S.tipoAto : (sugerido[c.dossie.atoSugerido] || "sentenca");
       const promptArea = S.prompts.find((x) => x.id === S.promptId) || null;
-      const montar = (d) => P.stage2({ dossie: d, paradigma: null, teses: [], precedentes: [], instrucao: $("#t-instrucao").value.trim(), tipoAto: c.tipoAto, promptArea });
+      const teses = AJ.selecionarTeses(S.teses, JSON.stringify(c.dossie) + " " + $("#t-instrucao").value, { area: promptArea ? promptArea.area : "" });
+      const montar = (d) => P.stage2({ dossie: d, paradigma: null, teses, precedentes: [], instrucao: $("#t-instrucao").value.trim(), tipoAto: c.tipoAto, promptArea });
       let prompt = montar(c.dossie);
       if (AJ.bytes(prompt) > MAX_BYTES - 5000) prompt = montar(compactar(c.dossie, MAX_BYTES - 5000 - (AJ.bytes(prompt) - AJ.bytes(JSON.stringify(c.dossie)))));
       painel("p-minuta"); S.minAba = "texto"; renderMinuta();
@@ -421,7 +422,8 @@
   $("#editor").addEventListener("change", () => { if ($("#editor").value !== S.caso.minuta) { S.anterior = S.caso.minuta; S.caso.minuta = $("#editor").value; salvarHistorico(); renderAcoes(); renderBotoes(); } });
   function conferencia() {
     const c = S.caso, fund = AJ.secao(c.minuta, "FUNDAMENTA", "DISPOSITIVO");
-    return { densos: AJ.paragrafosDensos(fund || c.minuta), nao: !c.dossie ? [] : c.apreciados ? c.dossie.pedidos.filter((p) => !c.apreciados.includes(p.id)) : AJ.pedidosNaoApreciados(c.dossie, c.minuta), sem: c.autos ? AJ.verificarFidelidade(c.minuta, c.autos) : [] };
+    const chaves = new Set(S.teses.map((t) => AJ.chaveTese(t.tipo, t.numero)).filter(Boolean));
+    return { fora: S.teses.length ? AJ.citacoesDeTeses(c.minuta).filter((x) => !chaves.has(x.chave)) : [], densos: AJ.paragrafosDensos(fund || c.minuta), nao: !c.dossie ? [] : c.apreciados ? c.dossie.pedidos.filter((p) => !c.apreciados.includes(p.id)) : AJ.pedidosNaoApreciados(c.dossie, c.minuta), sem: c.autos ? AJ.verificarFidelidade(c.minuta, c.autos) : [] };
   }
   function renderMinuta() {
     const c = S.caso, view = $("#min-view"), ed = $("#editor");
@@ -431,13 +433,15 @@
     if (S.minAba === "editar") { ed.value = c.minuta; return; }
     if (!c.minuta) return clear(view, h("div", { class: "placeholder" }, h("p", { text: c.autos ? "Autos prontos. Escolha o prompt e o tipo de ato e clique em Gerar minuta." : "Anexe os autos em PDF (ou use os autos de exemplo) para começar." }), h("p", { class: "small", text: "Etapa 1: o Claude extrai cronologia, pedidos de cada parte e provas com Mov./Arq./Pág. Etapa 2: redige relatório, fundamentação e dispositivo. Clique numa referência de página para abrir os autos nela." })));
     if (S.minAba === "texto") return clear(view, h("div", { class: "folha claude-out" }, md(c.minuta)));
-    const { densos, nao, sem } = conferencia(), piso = !c.tipoAto || c.tipoAto === "sentenca" ? 14 : 0;
+    const { densos, nao, sem, fora } = conferencia(), piso = !c.tipoAto || c.tipoAto === "sentenca" ? 14 : 0;
     const linha = (rot, n, bom) => h("div", { class: "check" }, h("span", { text: rot }), h("span", { class: "pill " + (bom ? "ok" : "bad"), text: String(n) }));
     clear(view, h("div", { class: "checks" },
       linha(piso ? "Parágrafos densos na fundamentação (mínimo 14)" : "Parágrafos densos na fundamentação", densos, densos >= piso),
       c.dossie ? linha("Pedidos não apreciados", nao.length, !nao.length) : null,
-      c.autos ? linha("Dados sem lastro nos autos", sem.length, !sem.length) : null),
+      c.autos ? linha("Dados sem lastro nos autos", sem.length, !sem.length) : null,
+      S.teses.length ? linha("Súmulas e temas fora do banco de teses", fora.length, !fora.length) : null),
       h("div", { class: "notes" }, nao.map((p) => h("div", { class: "bad", text: `${p.id} — ${p.litisconsorte}: ${p.descricao}` })), sem.map((d) => h("div", { class: "bad", text: `${d.tipo}: ${d.valor} não aparece nos autos` })),
+        fora.map((x) => h("div", { class: "warn", text: `${x.rotulo}: não está no banco de teses — confira número e texto antes de usar` })),
         c.dossie && c.dossie.alertas.length ? h("div", { class: "warn", text: "Alertas da Etapa 1: " + c.dossie.alertas.join(" · ") }) : null),
       piso && densos < piso && c.resumo ? h("div", { class: "row" }, h("button", { class: "btn quiet sm", type: "button", disabled: !!S.ctl || !S.cap.sample, onclick: aprofundar, text: "Aprofundar fundamentação" })) : null,
       !c.autos ? h("p", { class: "muted small", text: "Anexe os autos para conferir valores, datas e números." }) : null);
@@ -459,7 +463,7 @@
     b.disabled = true; b.textContent = "Reformatando…"; S.ctl = new AbortController(); renderBotoes();
     painel("p-minuta"); S.minAba = "texto";
     try {
-      const r = await ask(P.reformatar(base, (c.resumo || "").slice(0, 60000)), { tier: "complex", signal: S.ctl.signal,
+      const r = await ask(P.reformatar(base, (c.resumo || "").slice(0, 60000), tesesDaMinuta()), { tier: "complex", signal: S.ctl.signal,
         onText: ({ text }) => clear($("#min-view"), h("div", { class: "folha claude-out" }, md(text))) });
       if (r.truncated) toast("A resposta foi cortada pelo limite: confira o final antes de usar.");
       S.anterior = c.minuta; aplicarTexto(r.text); salvarHistorico();
@@ -663,7 +667,7 @@
     S.ctl = new AbortController(); renderBotoes(); $("#b-chat-parar").hidden = false;
     const fontes = [], nota = (t) => { const n = bolha.querySelector(".tool-note") || bolha.appendChild(h("p", { class: "tool-note" })); n.textContent = "Consultando os autos: " + t; };
     const usarFerr = !!(c.autos && S.cap.tools);
-    const contexto = P.chat({ resumo: (c.resumo || "").slice(0, 60000), minuta: c.minuta, paginas: c.paginas, nomeAutos: c.nome, ferramentas: usarFerr, autosTexto: usarFerr ? "" : autosParaIA(c.minuta + c.resumo) });
+    const contexto = P.chat({ resumo: (c.resumo || "").slice(0, 60000), minuta: c.minuta, paginas: c.paginas, nomeAutos: c.nome, ferramentas: usarFerr, autosTexto: usarFerr ? "" : autosParaIA(c.minuta + c.resumo), teses: tesesDaMinuta() });
     let hist = S.chat.slice(-8).map((m) => ({ role: m.role, content: m.role === "assistant" ? (separar(m.content).conversa || "Propus uma minuta atualizada.").slice(0, 3000) : m.content }));
     while (hist.length && hist[0].role !== "user") hist.shift();
     hist[0] = { role: "user", content: contexto + "\n\n---\nMENSAGEM:\n" + hist[0].content };
@@ -737,6 +741,77 @@
         if (await gravar("prompts", id, d, () => S.prompts.push({ ...d, id }))) n++;
       }
       renderPrompts(); renderSelect(); toast(`${n} prompt(s) importado(s).`);
+    } catch (e) { toast("Arquivo JSON inválido."); }
+  });
+
+  // ───────── Banco de teses do gabinete ─────────
+  const TIPOS_TESE = ["Súmula", "Súmula vinculante", "Tema repetitivo", "Repercussão geral", "IRDR/IAC", "Enunciado", "Artigo de lei", "Jurisprudência", "Tese do gabinete"];
+  clear($("#ts-tipo"), TIPOS_TESE.map((t) => h("option", { value: t, text: t })));
+  clear($("#ts-area"), h("option", { value: "Todas", text: "Todas as áreas" }), AREAS.map((a) => h("option", { value: a, text: a })));
+  clear($("#ts-fa"), h("option", { value: "", text: "Todas as áreas" }), AREAS.map((a) => h("option", { value: a, text: a })));
+  let tsEdit = null;
+  function tesesDaMinuta() {
+    const pr = S.prompts.find((x) => x.id === S.promptId);
+    return AJ.selecionarTeses(S.teses, `${S.caso.minuta} ${S.caso.resumo || ""}`, { area: pr ? pr.area : "" });
+  }
+  $("#ts-q").addEventListener("input", renderTeses);
+  $("#ts-fa").addEventListener("change", renderTeses);
+  function renderTeses() {
+    const q = $("#ts-q").value.trim().toLowerCase(), fa = $("#ts-fa").value;
+    const lista = S.teses.filter((x) => (!fa || x.area === fa || x.area === "Todas") && (!q || `${P.nomeTese(x)} ${x.assuntos || ""} ${x.texto}`.toLowerCase().includes(q)));
+    $("#ts-h").textContent = `Teses · ${S.teses.length}`;
+    clear($("#ts-list"), lista.length ? lista.map((x) => h("div", { class: "item" },
+      h("div", { class: "row" }, h("span", null, h("strong", { text: P.nomeTese(x) }), " ", h("span", { class: "tag", text: x.area === "Todas" ? "Todas as áreas" : x.area }), x.sempre ? h("span", { class: "tag", text: "usar sempre" }) : null),
+        h("div", { class: "row" },
+          h("button", { class: "btn sm quiet", type: "button", onclick: () => editarTese(x), text: "Editar" }),
+          h("button", { class: "btn sm quiet", type: "button", onclick: () => confirmar($("#ts-list"), `Remover “${P.nomeTese(x)}”?`, () => apagar("teses", x.id, () => { S.teses = S.teses.filter((y) => y.id !== x.id); renderTeses(); })), text: "Remover" }))),
+      h("p", { class: "cit-t", text: x.texto.slice(0, 400) + (x.texto.length > 400 ? "…" : "") }),
+      x.assuntos || x.quando ? h("p", { class: "muted small", text: [x.assuntos ? "Assuntos: " + x.assuntos : "", x.quando ? "Quando usar: " + x.quando : ""].filter(Boolean).join(" · ") }) : null))
+      : [h("p", { class: "muted small", text: S.teses.length ? "Nenhuma tese com esse filtro." : "Nenhuma tese ainda. Cadastre as súmulas, temas e artigos que o gabinete usa, com o texto conferido na fonte oficial." })]);
+  }
+  function editarTese(x) {
+    tsEdit = x ? x.id : null; $("#ts-form-h").textContent = x ? "Editar tese" : "Nova tese";
+    $("#ts-tipo").value = x ? x.tipo : TIPOS_TESE[0]; $("#ts-numero").value = x ? x.numero : ""; $("#ts-fonte").value = x ? x.fonte || "" : "";
+    $("#ts-area").value = x ? x.area || "Todas" : "Todas"; $("#ts-texto").value = x ? x.texto : ""; $("#ts-assuntos").value = x ? x.assuntos || "" : "";
+    $("#ts-quando").value = x ? x.quando || "" : ""; $("#ts-sempre").checked = !!(x && x.sempre);
+    if (x) $("#ts-numero").focus();
+  }
+  $("#ts-limpar").addEventListener("click", () => editarTese(null));
+  $("#ts-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const d = { tipo: $("#ts-tipo").value, numero: $("#ts-numero").value.trim(), fonte: $("#ts-fonte").value.trim(), area: $("#ts-area").value,
+      texto: $("#ts-texto").value.trim().slice(0, 20000), assuntos: $("#ts-assuntos").value.trim(), quando: $("#ts-quando").value.trim().slice(0, 2000), sempre: $("#ts-sempre").checked };
+    if (!d.numero || d.texto.length < 10) return toast("Informe o número e o texto da tese.");
+    const id = tsEdit || novoId();
+    if (await gravar("teses", id, d, () => { S.teses = [...S.teses.filter((y) => y.id !== id), { ...d, id }]; renderTeses(); })) { editarTese(null); toast("Tese salva."); }
+  });
+  $("#ts-exp").addEventListener("click", async () => {
+    if (!S.cap.downloads) return toast("Download indisponível nesta visualização.");
+    const dados = JSON.stringify({ tipo: "assessor-tjgo/teses", versao: 1, teses: S.teses.map(({ tipo, numero, fonte, area, texto, assuntos, quando, sempre }) => ({ tipo, numero, fonte, area, texto, assuntos, quando, sempre })) }, null, 2);
+    try { await S.cap.downloads.save({ filename: "teses.json", data: dados }); } catch (e) { if (e && e.code !== "declined") toast("Não foi possível salvar."); }
+  });
+  $("#ts-imp").addEventListener("change", async () => {
+    const f = $("#ts-imp").files[0]; $("#ts-imp").value = ""; if (!f) return;
+    try {
+      const j = JSON.parse(await f.text());
+      // Aceita o formato desta página e listas genéricas (titulo/enunciado/tribunal/palavrasChave).
+      const lista = (Array.isArray(j) ? j : j.teses || j.precedentes || []).filter((x) => x && typeof x === "object").map((x) => ({
+        tipo: TIPOS_TESE.includes(x.tipo) ? x.tipo : "Tese do gabinete",
+        numero: String(x.numero || x.identificador || x.titulo || x.title || "").trim().slice(0, 120),
+        fonte: String(x.fonte || x.tribunal || "").trim().slice(0, 80),
+        area: x.area === "Todas" || AREAS.includes(x.area) ? x.area : "Todas",
+        texto: String(x.texto || x.enunciado || x.conteudo || x.content || "").trim().slice(0, 20000),
+        assuntos: String(x.assuntos || (Array.isArray(x.palavrasChave) ? x.palavrasChave.join(", ") : Array.isArray(x.tags) ? x.tags.join(", ") : "")).slice(0, 300),
+        quando: String(x.quando || x.observacao || "").slice(0, 2000), sempre: !!x.sempre,
+      })).filter((x) => x.numero && x.texto.length >= 10);
+      if (!lista.length) return toast("Nenhuma tese válida no arquivo.");
+      let n = 0;
+      for (const d of lista) { // só acrescenta: nunca sobrescreve as existentes
+        if (S.teses.some((y) => y.numero === d.numero && y.texto === d.texto)) continue;
+        const id = novoId();
+        if (await gravar("teses", id, d, () => S.teses.push({ ...d, id }))) n++;
+      }
+      renderTeses(); toast(`${n} tese(s) importada(s).`);
     } catch (e) { toast("Arquivo JSON inválido."); }
   });
 
@@ -814,7 +889,7 @@
   function pill(id, txt, tom) { const el = $(id); el.textContent = txt; el.className = "pill " + (tom || ""); }
 
   async function iniciar() {
-    renderSelect(); renderPrompts(); renderHistorico(); render();
+    renderSelect(); renderPrompts(); renderTeses(); renderHistorico(); render();
     if (!window.claude || !window.claude.use) { pill("#st-claude", "Claude: abra no claude.ai", "bad"); pill("#st-db", "Dados: só nesta sessão", "warn"); return; }
     const [sample, db, user, downloads] = await Promise.all(["sample", "db", "user", "downloads"].map((n) => window.claude.use(n).catch(() => null)));
     Object.assign(S.cap, { sample, db, user, downloads });
@@ -825,6 +900,7 @@
       pill("#st-db", "Dados: sincronizados", "ok");
       const falha = () => pill("#st-db", "Dados: conexão perdida — recarregue", "bad");
       db.collection("prompts").onSnapshot((s) => { S.prompts = s.docs.map((d) => ({ ...d.data(), id: d.id })).sort((a, b) => String(a.titulo).localeCompare(String(b.titulo))); renderPrompts(); renderSelect(); }, falha);
+      db.collection("teses").onSnapshot((s) => { S.teses = s.docs.map((d) => ({ ...d.data(), id: d.id })).sort((a, b) => P.nomeTese(a).localeCompare(P.nomeTese(b), "pt-BR", { numeric: true })); renderTeses(); if (S.minAba === "conf") renderMinuta(); }, falha);
       if (S.cap.uid) db.collection("data/users/" + S.cap.uid).orderBy("atualizadoEm", "desc").limit(100).onSnapshot((s) => { S.historico = s.docs.map((d) => ({ ...d.data(), _id: d.id })).filter((m) => m.minuta); renderHistorico(); }, () => {});
     } else pill("#st-db", "Dados: só nesta sessão", "warn");
     renderHistorico(); render();
