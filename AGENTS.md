@@ -1,9 +1,9 @@
-# Diretrizes de desenvolvimento — Assessor Judicial IA
+# Diretrizes de desenvolvimento — Assessor TJGO
 
-1. **Não sobrescrever dados de usuários.** Teses, paradigmas, precedentes, equipe, históricos e configurações de gabinete nunca são substituídos por padrões do sistema. Não existe seed automático. Escritas no Firestore são sempre `merge`, e teses/paradigmas guardam a versão anterior em `historico/`.
-2. **Mudanças cirúrgicas.** Altere só o que o pedido exige; não refatore módulos que funcionam.
-3. **Regras da IA ficam no código, não só no prompt.** Fidelidade alfanumérica (`shared/fidelity.ts`), piso de extensão e pedidos não apreciados são verificados deterministicamente após a geração. Consectários são calculados por `shared/consectarios.ts`.
-4. **Prompts versionados** em `server/ai/prompts/`. Mantenha o prefixo `REGRAS_INEGOCIAVEIS` estável (cache de prompt).
-5. **Toda rota `/api/*` exige autenticação** e permissão explícita via `requirePermission`.
-6. **Antes de enviar:** `npm run typecheck && npm test`.
-7. **Nunca versionar autos, históricos ou backups** com dados processuais reais (`data/`, `*.tar.gz` estão no `.gitignore`).
+1. **Não sobrescrever dados de usuários.** Prompts, históricos e qualquer dado cadastrado nunca são substituídos por padrões do sistema. Não existe seed automático; importações só acrescentam.
+2. **Mudanças cirúrgicas.** Altere só o que o pedido exige; não refatore o que funciona.
+3. **Regras verificáveis ficam no código** (`core.js`, com teste em `test-core.mjs`): limpeza do PDF, localização Mov./Arq./Pág., conferência de pedidos e de dados alfanuméricos.
+4. **Prompts** ficam em `prompts.js`. Regras comuns (`REGRAS`, `LINGUAGEM`, `ESTRUTURA_TEXTO`, `REGRAS_CITACAO`) valem para a redação, a reformatação e o chat.
+5. **Antes de publicar:** `node test-core.mjs` e `node --check app.js core.js prompts.js`.
+6. **Nunca versionar autos, históricos, backups, `.env` ou chaves** (`data/`, `*.tar`, `*.zip` estão no `.gitignore`).
+7. Mudanças que apagam dados ou reescrevem o histórico do git só com confirmação explícita do usuário.
