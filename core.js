@@ -259,6 +259,13 @@
     }
     return [...out.values()];
   }
+  /** Mesma tese já cadastrada? Súmula/tema: mesmo número e tribunal. Demais: mesmo começo de texto. */
+  function mesmaTese(a, b) {
+    const ka = chaveTese(a.tipo, a.numero), kb = chaveTese(b.tipo, b.numero);
+    if (ka && kb) return ka === kb && semAcento(a.fonte).replace(/\W/g, "") === semAcento(b.fonte).replace(/\W/g, "");
+    const txt = (x) => semAcento(x.texto).replace(/[^a-z0-9]+/g, " ").trim().slice(0, 160);
+    return txt(a).length > 20 && txt(a) === txt(b);
+  }
   /** Teses que vão para o Claude: as da área (ou de todas as áreas); se não couberem em maxBytes,
    *  entram primeiro as marcadas "usar sempre" e as mais ligadas ao caso (assuntos, texto, número citado). */
   function selecionarTeses(teses, base, { area = "", maxBytes = 30000 } = {}) {
@@ -347,5 +354,5 @@
     return { inicioContagem, vencimento: isoD(d), diasCorridos: Math.round((d - parseData(intimacao)) / 86400000), ignorados };
   }
 
-  root.AJ = { cleanPages, isNoiseLine, verificarFidelidade, paragrafosDensos, secao, normalizarDossie, mergeDossies, resumoExecutivo, pedidosNaoApreciados, chunkText, bytes, hashId, normalizarPrecedente, rankPrecedentes, parseSeries, calcularConsectarios, loc, calcularPrazo, detectarLocais, chaveTese, citacoesDeTeses, selecionarTeses };
+  root.AJ = { cleanPages, isNoiseLine, verificarFidelidade, paragrafosDensos, secao, normalizarDossie, mergeDossies, resumoExecutivo, pedidosNaoApreciados, chunkText, bytes, hashId, normalizarPrecedente, rankPrecedentes, parseSeries, calcularConsectarios, loc, calcularPrazo, detectarLocais, chaveTese, citacoesDeTeses, selecionarTeses, mesmaTese };
 })(typeof window !== "undefined" ? window : globalThis);

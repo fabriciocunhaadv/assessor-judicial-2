@@ -176,6 +176,8 @@ button.ref { border: 0; cursor: pointer; }
 .item p { margin: 0; font-size: 13.5px; }
 .item .row { justify-content: space-between; }
 .item .cit-t { font-family: var(--f-doc); font-style: italic; border-left: 3px solid var(--line); padding-left: 10px; }
+.badge { display: inline-block; font: 700 11.5px/1 var(--f-mono); padding: 4px 7px; border-radius: 5px; background: var(--ink); color: var(--surface); margin-right: 6px; }
+.tags { display: flex; flex-wrap: wrap; gap: 4px 8px; font-size: 12px; color: var(--muted); }
 .check-f { display: flex; gap: 8px; align-items: flex-start; font-size: 13px; color: var(--muted); }
 .grid2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 420px); gap: 16px; align-items: start; }
 @media (max-width: 1000px) { .grid2 { grid-template-columns: minmax(0, 1fr); } }
@@ -289,10 +291,16 @@ button.ref { border: 0; cursor: pointer; }
 
   <!-- TESES -->
   <section role="tabpanel" id="teses" aria-labelledby="t-teses" hidden>
-    <div class="page-h"><h2>Banco de teses do gabinete</h2><p>Súmulas, temas, artigos de lei e entendimentos do juízo com o texto conferido. O Claude transcreve daqui, sem redigir de memória, na minuta, no Reformatar e no chat; a Conferência aponta súmulas e temas citados que não estão no banco.</p></div>
+    <div class="page-h"><h2>Banco de teses do gabinete</h2><p>Súmulas, temas, informativos, artigos de lei e entendimentos do juízo com o texto conferido. Anexe o PDF do informativo ou da lista de súmulas e o Claude organiza e lança cada item. O Claude transcreve daqui, sem redigir de memória, na minuta, no Reformatar e no chat; a Conferência aponta súmulas e temas citados que não estão no banco.</p></div>
     <div class="grid2">
-      <div class="panel"><header><h2 id="ts-h">Teses</h2><div class="row"><button class="btn quiet sm" id="ts-exp" type="button">Exportar</button><label class="btn quiet sm" for="ts-imp">Importar JSON<input type="file" id="ts-imp" accept="application/json,.json" hidden></label></div></header>
-        <div class="body"><div class="row"><input type="text" id="ts-q" placeholder="Filtrar por número, assunto ou texto" style="flex:1;min-width:0"><select id="ts-fa" aria-label="Filtrar por área" style="max-width:220px"></select></div><div class="items" id="ts-list"></div></div></div>
+      <div class="panel"><header><h2 id="ts-h">Teses</h2><div class="row"><label class="btn sm" for="ts-pdf">Anexar PDF (informativo / súmulas)<input type="file" id="ts-pdf" accept="application/pdf,.pdf" multiple hidden></label><button class="btn quiet sm" id="ts-exp" type="button">Exportar</button><label class="btn quiet sm" for="ts-imp">Importar JSON<input type="file" id="ts-imp" accept="application/json,.json" hidden></label></div></header>
+        <div class="body">
+          <div class="prog" id="ts-prog" hidden style="margin:0"><div class="prog-h"><strong id="ts-prog-t">Lendo o PDF…</strong><button class="btn danger sm" id="ts-parar" type="button">Parar</button></div><div class="bar big"><i id="ts-prog-bar"></i></div><div class="small muted" id="ts-prog-s"></div></div>
+          <div id="ts-err"></div>
+          <div class="row"><input type="text" id="ts-q" placeholder="Filtrar por número, assunto ou texto" style="flex:1;min-width:0"><select id="ts-fa" aria-label="Filtrar por área" style="max-width:220px"></select></div>
+          <div class="seg" id="ts-trib" role="radiogroup" aria-label="Tribunal"></div>
+          <div class="items" id="ts-list"></div>
+          <div class="row" id="ts-pag"></div></div></div>
       <div class="panel"><header><h2 id="ts-form-h">Nova tese</h2></header><div class="body">
         <form id="ts-form" class="stack">
           <div class="params">
@@ -303,6 +311,7 @@ button.ref { border: 0; cursor: pointer; }
             <label class="f" for="ts-fonte">Tribunal ou lei<input type="text" id="ts-fonte" maxlength="80" list="ts-fontes" placeholder="STJ · TJGO · CDC"><datalist id="ts-fontes"><option value="STF"><option value="STJ"><option value="TNU"><option value="TJGO"><option value="FONAJE"><option value="Código de Defesa do Consumidor"><option value="Código Civil"><option value="Código de Processo Civil"><option value="Constituição Federal"><option value="Gabinete"></datalist></label>
             <label class="f" for="ts-area">Área<select id="ts-area"></select></label>
           </div>
+          <label class="f" for="ts-titulo">Assunto (opcional)<input type="text" id="ts-titulo" maxlength="200" placeholder="Autolavagem e princípio da consunção"></label>
           <label class="f" for="ts-texto">Texto literal (como deve ser transcrito)<textarea id="ts-texto" rows="7" required placeholder="O Código de Defesa do Consumidor é aplicável às instituições financeiras."></textarea></label>
           <label class="f" for="ts-assuntos">Assuntos (separados por vírgula)<input type="text" id="ts-assuntos" maxlength="300" placeholder="banco, consignado, consumidor"></label>
           <label class="f" for="ts-quando">Quando usar (opcional, não é transcrito)<textarea id="ts-quando" rows="2" placeholder="Contratos bancários discutidos no Juizado."></textarea></label>
