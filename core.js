@@ -237,6 +237,46 @@
     }).filter((x) => x.score >= 3).sort((a, b) => b.score - a.score).slice(0, limite).map((x) => x.p);
   }
 
+  // ───────── Banco de teses do gabinete ─────────
+  const semAcento = (x) => String(x || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+  /** Chave de conferência: "s297" (súmula), "sv13" (súmula vinculante), "t1061" (tema); null para artigos, enunciados etc. */
+  function chaveTese(tipo, numero) {
+    const t = semAcento(tipo), n = /\d[\d.]*/.exec(String(numero || ""));
+    if (!n) return null;
+    const num = n[0].replace(/\./g, "").replace(/^0+(?=\d)/, "");
+    if (/vinculante/.test(t)) return "sv" + num;
+    if (/^sumula/.test(t)) return "s" + num;
+    if (/tema|repetitivo|repercuss/.test(t)) return "t" + num;
+    return null;
+  }
+  /** Súmulas e temas citados num texto: [{ chave, rotulo }], sem repetição. */
+  function citacoesDeTeses(texto) {
+    const out = new Map(), re = /\b(s[úu]mulas?\s+vinculantes?|s[úu]mulas?|temas?)\s*(?:n[º°o]?\.?\s*)?(\d{1,2}\.\d{3}|\d{1,4})(?![\d/])/gi;
+    for (const m of String(texto || "").matchAll(re)) {
+      const tipo = /vinculante/i.test(m[1]) ? "Súmula Vinculante" : /^s/i.test(m[1]) ? "Súmula" : "Tema";
+      const chave = chaveTese(tipo, m[2]);
+      if (chave && !out.has(chave)) out.set(chave, { chave, rotulo: `${tipo} ${m[2]}` });
+    }
+    return [...out.values()];
+  }
+  /** Teses que vão para o Claude: as da área (ou de todas as áreas); se não couberem em maxBytes,
+   *  entram primeiro as marcadas "usar sempre" e as mais ligadas ao caso (assuntos, texto, número citado). */
+  function selecionarTeses(teses, base, { area = "", maxBytes = 30000 } = {}) {
+    const pool = (Array.isArray(teses) ? teses : []).filter((t) => t && t.texto && (!t.area || t.area === "Todas" || !area || t.area === area));
+    const tam = (t) => bytes(JSON.stringify(t));
+    if (pool.reduce((n, t) => n + tam(t), 0) <= maxBytes) return [...pool.filter((t) => t.sempre), ...pool.filter((t) => !t.sempre)];
+    const ctx = new Set(tokens(base || "")), citadas = new Set(citacoesDeTeses(base).map((c) => c.chave));
+    const nota = (t) => (t.sempre ? 1000 : 0) + (citadas.has(chaveTese(t.tipo, t.numero)) ? 50 : 0)
+      + String(t.assuntos || "").split(/[,;\n]/).map(semAcento).map((x) => x.trim()).filter((x) => x && tokens(x).length && tokens(x).every((k) => ctx.has(k))).length * 5
+      + new Set(tokens(t.texto).filter((k) => ctx.has(k))).size;
+    const out = []; let usado = 0;
+    for (const { t, n } of pool.map((t) => ({ t, n: nota(t) })).filter((x) => x.n > 0).sort((a, b) => b.n - a.n)) {
+      if (usado + tam(t) > maxBytes) continue;
+      out.push(t); usado += tam(t);
+    }
+    return out;
+  }
+
   // ───────── Consectários — Lei 14.905/2024 ─────────
   const round2 = (n) => Math.round(n * 100) / 100;
   function competencias(a, b) {
@@ -307,5 +347,5 @@
     return { inicioContagem, vencimento: isoD(d), diasCorridos: Math.round((d - parseData(intimacao)) / 86400000), ignorados };
   }
 
-  root.AJ = { cleanPages, isNoiseLine, verificarFidelidade, paragrafosDensos, secao, normalizarDossie, mergeDossies, resumoExecutivo, pedidosNaoApreciados, chunkText, bytes, hashId, normalizarPrecedente, rankPrecedentes, parseSeries, calcularConsectarios, loc, calcularPrazo, detectarLocais };
+  root.AJ = { cleanPages, isNoiseLine, verificarFidelidade, paragrafosDensos, secao, normalizarDossie, mergeDossies, resumoExecutivo, pedidosNaoApreciados, chunkText, bytes, hashId, normalizarPrecedente, rankPrecedentes, parseSeries, calcularConsectarios, loc, calcularPrazo, detectarLocais, chaveTese, citacoesDeTeses, selecionarTeses };
 })(typeof window !== "undefined" ? window : globalThis);

@@ -175,6 +175,8 @@ button.ref { border: 0; cursor: pointer; }
 .item { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; display: grid; gap: 6px; }
 .item p { margin: 0; font-size: 13.5px; }
 .item .row { justify-content: space-between; }
+.item .cit-t { font-family: var(--f-doc); font-style: italic; border-left: 3px solid var(--line); padding-left: 10px; }
+.check-f { display: flex; gap: 8px; align-items: flex-start; font-size: 13px; color: var(--muted); }
 .grid2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 420px); gap: 16px; align-items: start; }
 @media (max-width: 1000px) { .grid2 { grid-template-columns: minmax(0, 1fr); } }
 .page-h { margin-bottom: 14px; } .page-h h2 { font-size: 18px; font-weight: 600; } .page-h p { margin: 2px 0 0; color: var(--muted); font-size: 13.5px; }
@@ -193,6 +195,7 @@ button.ref { border: 0; cursor: pointer; }
     <nav class="menu" role="tablist" aria-label="Telas">
       <button role="tab" id="t-processo" aria-controls="processo" aria-selected="true">Processo</button>
       <button role="tab" id="t-prompts" aria-controls="prompts" aria-selected="false">Prompts</button>
+      <button role="tab" id="t-teses" aria-controls="teses" aria-selected="false">Teses</button>
       <button role="tab" id="t-historico" aria-controls="historico" aria-selected="false">Histórico</button>
     </nav>
     <div class="status"><span class="pill" id="st-claude">Claude: conectando…</span><span class="pill" id="st-db">Dados: conectando…</span></div>
@@ -280,6 +283,31 @@ button.ref { border: 0; cursor: pointer; }
           <label class="f" for="pr-area">Área<select id="pr-area"></select></label>
           <label class="f" for="pr-texto">Instruções<textarea id="pr-texto" rows="12" required placeholder="1. Aplique os Enunciados do FONAJE pertinentes…"></textarea></label>
           <div class="row"><button class="btn" type="submit">Salvar</button><button class="btn quiet" type="button" id="pr-limpar">Limpar</button></div>
+        </form></div></div>
+    </div>
+  </section>
+
+  <!-- TESES -->
+  <section role="tabpanel" id="teses" aria-labelledby="t-teses" hidden>
+    <div class="page-h"><h2>Banco de teses do gabinete</h2><p>Súmulas, temas, artigos de lei e entendimentos do juízo com o texto conferido. O Claude transcreve daqui, sem redigir de memória, na minuta, no Reformatar e no chat; a Conferência aponta súmulas e temas citados que não estão no banco.</p></div>
+    <div class="grid2">
+      <div class="panel"><header><h2 id="ts-h">Teses</h2><div class="row"><button class="btn quiet sm" id="ts-exp" type="button">Exportar</button><label class="btn quiet sm" for="ts-imp">Importar JSON<input type="file" id="ts-imp" accept="application/json,.json" hidden></label></div></header>
+        <div class="body"><div class="row"><input type="text" id="ts-q" placeholder="Filtrar por número, assunto ou texto" style="flex:1;min-width:0"><select id="ts-fa" aria-label="Filtrar por área" style="max-width:220px"></select></div><div class="items" id="ts-list"></div></div></div>
+      <div class="panel"><header><h2 id="ts-form-h">Nova tese</h2></header><div class="body">
+        <form id="ts-form" class="stack">
+          <div class="params">
+            <label class="f" for="ts-tipo">Tipo<select id="ts-tipo"></select></label>
+            <label class="f" for="ts-numero">Número ou identificação<input type="text" id="ts-numero" required maxlength="120" placeholder="297 · 1.061 · art. 6º, VIII"></label>
+          </div>
+          <div class="params">
+            <label class="f" for="ts-fonte">Tribunal ou lei<input type="text" id="ts-fonte" maxlength="80" list="ts-fontes" placeholder="STJ · TJGO · CDC"><datalist id="ts-fontes"><option value="STF"><option value="STJ"><option value="TNU"><option value="TJGO"><option value="FONAJE"><option value="Código de Defesa do Consumidor"><option value="Código Civil"><option value="Código de Processo Civil"><option value="Constituição Federal"><option value="Gabinete"></datalist></label>
+            <label class="f" for="ts-area">Área<select id="ts-area"></select></label>
+          </div>
+          <label class="f" for="ts-texto">Texto literal (como deve ser transcrito)<textarea id="ts-texto" rows="7" required placeholder="O Código de Defesa do Consumidor é aplicável às instituições financeiras."></textarea></label>
+          <label class="f" for="ts-assuntos">Assuntos (separados por vírgula)<input type="text" id="ts-assuntos" maxlength="300" placeholder="banco, consignado, consumidor"></label>
+          <label class="f" for="ts-quando">Quando usar (opcional, não é transcrito)<textarea id="ts-quando" rows="2" placeholder="Contratos bancários discutidos no Juizado."></textarea></label>
+          <label class="check-f"><input type="checkbox" id="ts-sempre"> Usar sempre nesta área, mesmo quando os assuntos não aparecerem no caso</label>
+          <div class="row"><button class="btn" type="submit">Salvar</button><button class="btn quiet" type="button" id="ts-limpar">Limpar</button></div>
         </form></div></div>
     </div>
   </section>

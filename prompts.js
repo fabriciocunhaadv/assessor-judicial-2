@@ -32,7 +32,7 @@ REGRAS INEGOCIÁVEIS
     Transcreva o caput e só os parágrafos/incisos pertinentes, usando [...] para as omissões. Se não tiver certeza da redação literal, escreva "(transcrição a conferir)" depois da referência — nunca invente texto de lei.
   • Súmulas e teses: > "Súmula 479 do STJ: As instituições financeiras respondem objetivamente pelos danos gerados por fortuito interno relativo a fraudes e delitos praticados por terceiros no âmbito de operações bancárias."
   • Provas decisivas (depoimentos, laudos, contratos): transcreva o trecho literal entre aspas com a localização ao final, ex.: > "a autora desconhecia a conta indicada" (Mov. 30, Arq. 1, Pág. 2).
-- Jurisprudência: cite súmulas e teses do STF, STJ e TNU (súmulas vinculantes, temas de repercussão geral e de recursos repetitivos) e entendimentos do TJGO com o número e o enunciado entre aspas, em parágrafo próprio iniciado por ">". Use apenas enunciados que você conhece com segurança ou que constem da lista de precedentes abaixo; nunca invente número de súmula, tema, acórdão ou relator.
+- Jurisprudência: cite súmulas e teses do STF, STJ e TNU (súmulas vinculantes, temas de repercussão geral e de recursos repetitivos) e entendimentos do TJGO com o número e o enunciado entre aspas, em parágrafo próprio iniciado por ">". Use apenas enunciados que você conhece com segurança ou que constem do banco de teses do gabinete ou da lista de precedentes abaixo; nunca invente número de súmula, tema, acórdão ou relator.
 - Localização das provas no formato "(Mov. 30, Arq. 1, Pág. 2)"; intervalo de páginas: "(Mov. 1, Arq. 2, Págs. 1-4)"; vários arquivos da mesma movimentação: "(Mov. 10, Arq. 1, Págs. 1-3 e Arq. 10, Págs. 1-3)". Não repita a mesma referência a cada frase.`;
 
   const stage1 = (bloco, i, n) => `${REGRAS}
@@ -64,6 +64,18 @@ ${bloco}
 </autos>`;
 
   /** Estrutura por tipo de ato (mesmo texto de shared/gabinete.ts). A fundamentação longa só é exigida em sentença. */
+  /** Banco de teses do gabinete: textos conferidos pelo gabinete, fonte preferencial das transcrições. */
+  const nomeTese = (t) => /^\d/.test(t.numero || "") ? [t.tipo, t.numero, t.fonte ? `do ${t.fonte}` : ""].filter(Boolean).join(" ")
+    : `${t.tipo}: ${t.numero}${t.fonte && !/gabinete/i.test(t.fonte) ? ` — ${t.fonte}` : ""}`;
+  const bancoTeses = (teses) => !teses || !teses.length ? "" : `BANCO DE TESES DO GABINETE (textos conferidos pelo gabinete — fonte preferencial)
+- Quando o caso se enquadrar, aplique a tese e transcreva o texto EXATAMENTE como está abaixo, em citação destacada (parágrafo iniciado por ">"), com a identificação no início ou ao final.
+- Súmula, tema ou artigo que esteja no banco: use SEMPRE a redação do banco, nunca outra.
+- Súmula, tema ou precedente fora do banco: cite apenas se tiver certeza do número e do enunciado; na dúvida, não cite.
+- "Quando usar" e "Assuntos" orientam a aplicação e NÃO são transcritos. "Tese do gabinete" é o entendimento do juízo: aplique quando o caso se enquadrar, com fundamentação própria.
+<banco_de_teses>
+${teses.map((t, i) => `[T${i + 1}] ${nomeTese(t)}${t.assuntos ? ` · Assuntos: ${t.assuntos}` : ""}${t.quando ? `\nQuando usar: ${t.quando}` : ""}\nTexto: ${t.texto}`).join("\n\n")}
+</banco_de_teses>`;
+
   const REGRA_POR_ATO = {
     sentenca: "SENTENÇA completa: relatório, fundamentação nos 7 blocos (mínimo de 14 parágrafos densos) e dispositivo que resolve cada pedido.",
     decisao: "DECISÃO INTERLOCUTÓRIA (ex.: tutela de urgência, saneamento do art. 357 do CPC): relatório breve, fundamentação objetiva nos blocos pertinentes (omita os que não se aplicam) e dispositivo com as providências.",
@@ -124,8 +136,7 @@ ${paradigma.texto.slice(0, 40000)}
 </paradigma>`;
     if (teses.length) s += `
 
-TESES DO GABINETE (entendimento do juízo — aplique quando o caso se enquadrar e cite expressamente):
-${teses.map((t, i) => `T${i + 1}. ${t.titulo}: ${t.texto}`).join("\n")}`;
+${bancoTeses(teses)}`;
     if (precedentes.length) s += `
 
 PRECEDENTES POSSIVELMENTE APLICÁVEIS (art. 927 do CPC). Aplique, distinga ou supere de forma fundamentada; não cite precedente fora desta lista ou do dossiê:
@@ -211,7 +222,7 @@ ${anotacoes}
 </anotacoes>`;
 
   /** Contexto do chat: vai no início da conversa a cada envio (a minuta pode ter mudado). */
-  const chat = ({ resumo, minuta, paginas, nomeAutos, ferramentas, autosTexto }) => `${REGRAS}
+  const chat = ({ resumo, minuta, paginas, nomeAutos, ferramentas, autosTexto, teses = [] }) => `${REGRAS}
 
 PAPEL: ASSISTENTE DO GABINETE EM CONVERSA SOBRE A MINUTA E OS AUTOS.
 O assessor ou o(a) juiz(a) vai conversar com você sobre a minuta abaixo: tirar dúvidas, pedir resumo, pedir a reanálise de um documento dos autos, pedir melhoria, ajuste ou reescrita de trechos, conferir pedidos, revisar a linguagem.
@@ -230,6 +241,7 @@ COMO RESPONDER
 - Nunca invente conteúdo de documento: se precisar do texto de uma peça, ${ferramentas ? "use as ferramentas buscar_nos_autos e ler_paginas" : "use o texto dos autos abaixo"}; se não encontrar, diga que não encontrou.
 ${ferramentas ? `\nAUTOS: "${nomeAutos || "autos"}", ${paginas} página(s). Use buscar_nos_autos para localizar peças e trechos (ex.: "contestação", "laudo", "Mov. 18", um nome ou valor) e ler_paginas para ler o texto integral das páginas antes de reanalisar um documento.` : ""}
 
+${teses.length ? `\n${bancoTeses(teses)}\n` : ""}
 <resumo_executivo_dos_autos>
 ${resumo || "(sem resumo executivo)"}
 </resumo_executivo_dos_autos>
@@ -363,7 +375,7 @@ ${autos}
 </autos>`;
 
   /** Reescreve uma minuta pronta no padrão atual (citações, transcrição da lei, linguagem), sem mudar o conteúdo jurídico. */
-  const reformatar = (minuta, resumo) => `${REGRAS}
+  const reformatar = (minuta, resumo, teses = []) => `${REGRAS}
 
 PAPEL: REVISOR DE FORMA E DE ESTRUTURA. Reescreva a minuta abaixo no padrão do gabinete, melhorando a organização, a divisão em parágrafos, o encadeamento lógico e as citações, SEM mudar o conteúdo jurídico: mantenha os fatos, as provas, os fundamentos, os resultados de cada pedido e o dispositivo exatamente como decididos.
 
@@ -380,7 +392,7 @@ ${LINGUAGEM}
 
 ${ESTRUTURA_TEXTO}
 
-Responda somente com a minuta INTEGRAL reescrita, em Markdown, sem comentários.
+${teses.length ? `${bancoTeses(teses)}\n\n` : ""}Responda somente com a minuta INTEGRAL reescrita, em Markdown, sem comentários.
 
 <resumo_dos_autos>
 ${resumo || "(sem resumo)"}
@@ -390,5 +402,5 @@ ${resumo || "(sem resumo)"}
 ${minuta}
 </minuta>`;
 
-  root.PROMPTS = { REGRA_POR_ATO, stage1, stage2, aprofundar, auditoria, gabarito, audiencia, termo, chat, precedentes, fatoProva, conformidade, peticao, peticaoAnalise, mutiraoTermo, mutiraoSentenca, reformatar };
+  root.PROMPTS = { REGRA_POR_ATO, stage1, stage2, aprofundar, auditoria, gabarito, audiencia, termo, chat, precedentes, fatoProva, conformidade, peticao, peticaoAnalise, mutiraoTermo, mutiraoSentenca, reformatar, nomeTese };
 })(window);

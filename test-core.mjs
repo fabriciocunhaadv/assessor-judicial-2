@@ -31,5 +31,15 @@ const txtLoc = AJ.cleanPages(pgs, true, dl.locais);
 t("marcador triplo", txtLoc.includes("⟦Mov. 18 · Arq. 2 · Pág. 1 | PDF 4⟧"));
 const rod = AJ.detectarLocais(["Mov. 1 - Arq. 1\na\nPág. 1 de 3", "b\nPág. 2 de 3", "Mov. 18 - Arq. 1\nc\nPág. 3 de 3"]);
 t("rodapé do PDF não vira página do arquivo", rod.locais[2].pag === "1" && rod.locais[1].pag === "2");
+t("chave de tese", AJ.chaveTese("Súmula", "297") === "s297" && AJ.chaveTese("Tema repetitivo", "1.061") === "t1061" && AJ.chaveTese("Súmula vinculante", "13") === "sv13" && AJ.chaveTese("Artigo de lei", "art. 14") === null);
+const cit = AJ.citacoesDeTeses("Aplica-se a Súmula 297 do STJ e o Tema 1.061. Ver Súmula Vinculante n. 13 e a súmula nº 297.");
+t("citações de súmulas e temas", cit.map((c) => c.chave).join() === "s297,t1061,sv13");
+const banco = [
+  { tipo: "Súmula", numero: "297", fonte: "STJ", texto: "O Código de Defesa do Consumidor é aplicável às instituições financeiras.", assuntos: "banco, consumidor", area: "Todas" },
+  { tipo: "Súmula", numero: "385", fonte: "STJ", texto: "Da anotação irregular em cadastro de proteção ao crédito não cabe indenização por dano moral quando preexistente legítima inscrição.", assuntos: "negativação", area: "Cível" },
+  { tipo: "Tese do gabinete", numero: "Fixação", texto: "Dano moral em desconto indevido: R$ 5.000,00.", sempre: true, area: "Juizado Especial Cível" },
+];
+t("teses: tudo que cabe, filtrado pela área", AJ.selecionarTeses(banco, "", { area: "Juizado Especial Cível" }).map((x) => x.numero).join() === "Fixação,297");
+t("teses: sem caber, ranqueia pelo caso", AJ.selecionarTeses(banco, "contrato com banco e consumidor", { maxBytes: 450 }).map((x) => x.numero).join() === "Fixação,297");
 console.log(`${ok} ok, ${fail} falhas`);
 if (fail) process.exit(1);

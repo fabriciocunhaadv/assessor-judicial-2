@@ -16,6 +16,7 @@ Mesa de trabalho do assessor de gabinete do TJGO, feita para rodar **dentro do c
 - **Reformatar:** aplica o padrão atual a uma minuta já gerada, sem reler os autos.
 - **Exportação:** Word (.docx) e PDF no padrão de peça (Times 12, justificado, recuo de 2 cm, citações recuadas 4 cm em itálico).
 - **Prompts:** instruções por matéria, com importação do JSON exportado pelo sistema antigo.
+- **Teses:** banco de súmulas, temas, artigos e entendimentos do gabinete com o texto conferido. O Claude transcreve daqui na minuta, no Reformatar e no chat; a Conferência aponta súmulas e temas citados fora do banco. Importação só acrescenta.
 - **Histórico:** minutas e conversas, privadas por pessoa. Os autos nunca são gravados.
 
 ## Arquivos
@@ -24,7 +25,7 @@ Mesa de trabalho do assessor de gabinete do TJGO, feita para rodar **dentro do c
 |---|---|
 | `index.html` | Tela e estilos |
 | `app.js` | Lógica da página (leitura do PDF, etapas, chat, prompts, histórico, exportação) |
-| `core.js` | Regras sem IA: limpeza do PDF, carimbos Mov./Arq./Pág., conferência, divisão em blocos, prazos |
+| `core.js` | Regras sem IA: limpeza do PDF, carimbos Mov./Arq./Pág., conferência, seleção do banco de teses, divisão em blocos, prazos |
 | `prompts.js` | Instruções enviadas ao Claude |
 | `docx.min.js`, `jspdf.min.js` | Bibliotecas de Word e PDF (docx 9.8.1 e jsPDF 2.5.2), carregadas só ao exportar |
 | `test-core.mjs` | Testes de `core.js` (`node test-core.mjs`) |
