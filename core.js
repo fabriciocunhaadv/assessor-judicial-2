@@ -125,6 +125,15 @@
   }
   const paragrafosDensos = (t, min = 250) => t.split(/\n\s*\n/).filter((p) => p.trim().length >= min && !/^#/.test(p.trim())).length;
 
+  /** Fundamentação: seção "## FUNDAMENTAÇÃO" ou, no modelo sem subtítulos, o trecho entre "DECIDO." e "Pelo exposto". */
+  function fundamentacao(md) {
+    const t = String(md || ""), s = secao(t, "FUNDAMENTA", "DISPOSITIVO");
+    if (s) return s;
+    const i = t.search(/DECIDO\.?\**\s*$/im);
+    if (i < 0) return "";
+    const resto = t.slice(i).replace(/^.*\n/, ""), j = resto.search(/^\s*(Pelo exposto|Diante do exposto|Ante o exposto|Por isso|Diante disso),/im);
+    return j < 0 ? resto : resto.slice(0, j);
+  }
   function secao(md, titulo, proximo) {
     const i = md.search(new RegExp("^#{1,3}\\s*" + titulo, "im"));
     if (i < 0) return "";
@@ -147,6 +156,9 @@
       preliminares: arr(d.preliminares).map((x) => ({ arguidaPor: str(x.arguidaPor), tese: str(x.tese, ""), pag: str(x.pag) })),
       provas: arr(d.provas).map((x) => ({ descricao: str(x.descricao, ""), produzidaPor: str(x.produzidaPor), mov: str(x.mov), pag: str(x.pag) })),
       pontosControvertidos: arr(d.pontosControvertidos).map(String),
+      fatosAlegados: arr(d.fatosAlegados).map((x) => ({ parte: str(x.parte), fato: str(x.fato, ""), mov: str(x.mov), pag: str(x.pag) })).filter((x) => x.fato),
+      documentos: arr(d.documentos).map((x) => ({ descricao: str(x.descricao, ""), juntadoPor: str(x.juntadoPor), mov: str(x.mov), arq: str(x.arq), pag: str(x.pag), observacao: str(x.observacao, "") })).filter((x) => x.descricao),
+      contexto: arr(d.contexto).map(String),
       faseProcessual: str(d.faseProcessual), atoSugerido: str(d.atoSugerido, "sentenca"),
       alertas: arr(d.alertas).map(String),
     };
@@ -167,6 +179,7 @@
       pedidos: parts.flatMap((p) => p.pedidos).filter((x) => { const k = (x.litisconsorte + "|" + x.descricao + "|" + x.valor).toLowerCase(); if (seen.has(k)) return false; seen.add(k); return true; }).map((x, i) => ({ ...x, id: "P" + (i + 1) })),
       preliminares: parts.flatMap((p) => p.preliminares), provas: parts.flatMap((p) => p.provas),
       pontosControvertidos: uniq(parts.flatMap((p) => p.pontosControvertidos)),
+      fatosAlegados: parts.flatMap((p) => p.fatosAlegados), documentos: parts.flatMap((p) => p.documentos), contexto: uniq(parts.flatMap((p) => p.contexto)),
       faseProcessual: last.faseProcessual, atoSugerido: last.atoSugerido,
       alertas: uniq([...parts.flatMap((p) => p.alertas), `Autos lidos em ${parts.length} blocos — confira a continuidade da cronologia.`]),
     };
@@ -179,11 +192,14 @@
     const L = [];
     L.push(`# Resumo Executivo — ${d.numeroProcesso}`, `${d.classe} · ${d.unidade}`, `Fase: ${d.faseProcessual} · Ato sugerido: ${d.atoSugerido}`);
     L.push(`\n## Partes\nPolo ativo: ${d.partes.polo_ativo.join("; ") || "n/i"}\nPolo passivo: ${d.partes.polo_passivo.join("; ") || "n/i"}` + (d.partes.terceiros.length ? `\nTerceiros: ${d.partes.terceiros.join("; ")}` : ""));
+    if ((d.fatosAlegados || []).length) { L.push("\n## Fatos narrados pelas partes"); d.fatosAlegados.forEach((f) => L.push(`- ${f.parte}: ${f.fato} (${loc(f)})`)); }
+    if ((d.contexto || []).length) { L.push("\n## Contexto relevante"); d.contexto.forEach((c) => L.push(`- ${c}`)); }
     L.push("\n## Pedidos");
     d.pedidos.forEach((p) => L.push(`- [${p.id}] ${p.litisconsorte}: ${p.descricao}${p.valor ? ` — ${p.valor}` : ""} (${p.natureza}; ${loc(p)})`));
     if (d.preliminares.length) { L.push("\n## Preliminares"); d.preliminares.forEach((p) => L.push(`- ${p.arguidaPor}: ${p.tese} (Pág. ${p.pag})`)); }
     L.push("\n## Cronologia");
     d.cronologia.forEach((e) => { L.push(`- ${e.data} · ${e.tipo} (${loc(e)}): ${e.resumo}`); e.transcricoes.forEach((t) => L.push(`  > "${t}"`)); });
+    if ((d.documentos || []).length) { L.push("\n## Documentos juntados"); d.documentos.forEach((x) => L.push(`- ${x.descricao}${x.juntadoPor ? " — " + x.juntadoPor : ""} (${loc(x)})${x.observacao ? " · " + x.observacao : ""}`)); }
     if (d.provas.length) { L.push("\n## Provas"); d.provas.forEach((p) => L.push(`- ${p.descricao} — ${p.produzidaPor} (${loc(p)})`)); }
     if (d.pontosControvertidos.length) { L.push("\n## Pontos controvertidos"); d.pontosControvertidos.forEach((p) => L.push(`- ${p}`)); }
     if (d.alertas.length) { L.push("\n## Alertas"); d.alertas.forEach((p) => L.push(`- ${p}`)); }
@@ -258,6 +274,37 @@
       if (chave && !out.has(chave)) out.set(chave, { chave, rotulo: `${tipo} ${m[2]}` });
     }
     return [...out.values()];
+  }
+  // ───────── TPU do PROJUDI ─────────
+  const TPU_INI = "===TPU===", TPU_FIM = "===FIM TPU===";
+  /** TPUs que o Claude recebe conforme o ato (a tabela inteira é grande demais para toda chamada). */
+  function tpusPorAto(lista, tipo) {
+    const L = Array.isArray(lista) ? lista : [];
+    const avulsa = (t) => !/^(Decisão|Despacho|Julgamento|Escrivão)/.test(t.nome);
+    if (tipo === "sentenca") return L.filter((t) => !/^Despacho/.test(t.nome) && (/^Julgamento/.test(t.nome) || /Homologação|Embargos Julgados/.test(t.nome) || avulsa(t)));
+    if (tipo === "embargos") return L.filter((t) => /Embargos/i.test(t.nome));
+    if (tipo === "despacho") return L.filter((t) => /^Despacho/.test(t.nome) || /^Decisão -> (Determinação|Nomeação|Recebimento -> Emenda)/.test(t.nome));
+    return L.filter((t) => /^(Decisão|Despacho)/.test(t.nome) || avulsa(t));
+  }
+  /** Separa o bloco ===TPU=== do texto da minuta: { corpo, tpus: [{ linha, nome, cnj }] }. */
+  function separarTpu(texto) {
+    const t = String(texto || ""), i = t.indexOf(TPU_INI);
+    if (i < 0) return { corpo: t, tpus: [] };
+    const j = t.indexOf(TPU_FIM, i), bloco = t.slice(i + TPU_INI.length, j < 0 ? undefined : j);
+    const tpus = bloco.split("\n").map((l) => l.replace(/^[\s\-•*]+/, "").trim()).filter(Boolean).map((linha) => {
+      const m = /^(.*?)\s*\(CNJ:\s*(\d+)\)\s*$/.exec(linha);
+      return { linha, nome: m ? m[1].trim() : linha, cnj: m ? m[2] : "" };
+    });
+    return { corpo: (t.slice(0, i) + (j < 0 ? "" : t.slice(j + TPU_FIM.length))).replace(/\n{3,}/g, "\n\n").trim(), tpus };
+  }
+  /** Confere cada TPU indicada contra a tabela: código existente e nome correspondente. */
+  function conferirTpu(tpus, lista) {
+    const norm = (x) => semAcento(x).replace(/[^a-z0-9]+/g, " ").trim();
+    return (tpus || []).map((t) => {
+      const doCodigo = (lista || []).filter((x) => x.cnj === t.cnj);
+      const ok = doCodigo.some((x) => norm(x.nome) === norm(t.nome));
+      return { ...t, ok, sugestao: !ok && doCodigo.length ? `${doCodigo[0].nome} (CNJ:${doCodigo[0].cnj})` : "" };
+    });
   }
   /** Resposta JSON cortada pelo limite: recupera os objetos completos de "itens" já escritos. */
   function itensParciais(texto) {
@@ -370,5 +417,5 @@
     return { inicioContagem, vencimento: isoD(d), diasCorridos: Math.round((d - parseData(intimacao)) / 86400000), ignorados };
   }
 
-  root.AJ = { cleanPages, isNoiseLine, verificarFidelidade, paragrafosDensos, secao, normalizarDossie, mergeDossies, resumoExecutivo, pedidosNaoApreciados, chunkText, bytes, hashId, normalizarPrecedente, rankPrecedentes, parseSeries, calcularConsectarios, loc, calcularPrazo, detectarLocais, chaveTese, citacoesDeTeses, selecionarTeses, mesmaTese, itensParciais };
+  root.AJ = { cleanPages, isNoiseLine, verificarFidelidade, paragrafosDensos, secao, normalizarDossie, mergeDossies, resumoExecutivo, pedidosNaoApreciados, chunkText, bytes, hashId, normalizarPrecedente, rankPrecedentes, parseSeries, calcularConsectarios, loc, calcularPrazo, detectarLocais, chaveTese, citacoesDeTeses, selecionarTeses, mesmaTese, itensParciais, fundamentacao, tpusPorAto, separarTpu, conferirTpu, TPU_INI, TPU_FIM };
 })(typeof window !== "undefined" ? window : globalThis);

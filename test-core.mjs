@@ -44,5 +44,18 @@ t("teses: sem caber, ranqueia pelo caso", AJ.selecionarTeses(banco, "contrato co
 t("mesma tese", AJ.mesmaTese({ tipo: "Súmula", numero: "297", fonte: "STJ" }, { tipo: "Súmula", numero: "297", fonte: "stj" }) && !AJ.mesmaTese({ tipo: "Súmula", numero: "297", fonte: "STJ" }, { tipo: "Súmula", numero: "297", fonte: "STF" })
   && AJ.mesmaTese({ tipo: "Informativo", numero: "726", texto: "Na autolavagem não ocorre a consunção entre a corrupção passiva e a lavagem." }, { tipo: "Informativo", numero: "726", texto: "Na autolavagem, não ocorre a consunção entre a corrupção passiva e a lavagem!" }));
 t("itens de JSON cortado", AJ.itensParciais('{"itens":[{"tipo":"Súmula","texto":"a } \\" b"},{"tipo":"Tema","texto":"x"},{"tipo":"Súm').map((x) => x.tipo).join() === "Súmula,Tema");
+const semTit = "Trata-se de ação.\n\nSobreveio decisão.\n\n**DECIDO.**\n\nPrimeiro fundamento.\n\nSegundo fundamento.\n\nPelo exposto, **JULGO PROCEDENTE**.";
+t("fundamentação sem subtítulos", AJ.fundamentacao(semTit).includes("Segundo fundamento") && !AJ.fundamentacao(semTit).includes("Sobreveio") && !AJ.fundamentacao(semTit).includes("JULGO"));
+t("fundamentação com subtítulos", AJ.fundamentacao("## RELATÓRIO\na\n## FUNDAMENTAÇÃO\nb\n## DISPOSITIVO\nc").includes("b"));
+const dd = AJ.mergeDossies([{ fatosAlegados: [{ parte: "Autora", fato: "Filho nasceu em 17/06/2021" }], contexto: ["Medidas protetivas no processo 5719833"] }, { documentos: [{ descricao: "Certidão de nascimento" }], contexto: ["Medidas protetivas no processo 5719833"] }]);
+t("dossiê guarda fatos, documentos e contexto", dd.fatosAlegados.length === 1 && dd.documentos.length === 1 && dd.contexto.length === 1 && AJ.resumoExecutivo(dd).includes("Fatos narrados"));
+await import("./tpu.js");
+const TPU = globalThis.TPU;
+t("tabela de TPU carregada", TPU.length === 403 && TPU.some((x) => x.cnj === "787"));
+t("TPU por ato", AJ.tpusPorAto(TPU, "sentenca").some((x) => x.cnj === "219") && AJ.tpusPorAto(TPU, "sentenca").every((x) => !/^Despacho/.test(x.nome)) && AJ.tpusPorAto(TPU, "decisao").some((x) => x.cnj === "332") && AJ.tpusPorAto(TPU, "embargos").every((x) => /Embargos/i.test(x.nome)));
+const mt = AJ.separarTpu("Pelo exposto:\n\n**1. CONCEDO** a gratuidade.\n\n===TPU===\nDecisão -> Concessão -> Gratuidade da Justiça (CNJ:787)\n- Decisão -> Concessão -> Inventada (CNJ:99999)\n===FIM TPU===");
+t("separa o bloco de TPU", mt.tpus.length === 2 && !mt.corpo.includes("TPU") && mt.corpo.endsWith("gratuidade."));
+const ct = AJ.conferirTpu(mt.tpus, TPU);
+t("confere TPU contra a tabela", ct[0].ok && !ct[1].ok);
 console.log(`${ok} ok, ${fail} falhas`);
 if (fail) process.exit(1);

@@ -28,7 +28,7 @@
   const S = {
     caso: null, prompts: [], teses: [], historico: [], chat: [], ctl: null, pagina: 1, tipoAto: "auto", promptId: lido("tj.prompt"),
     minAba: "texto", anterior: null,
-    cap: { sample: null, db: null, user: null, downloads: null, uid: null, tools: false },
+    cap: { sample: null, db: null, user: null, downloads: null, uid: null, tools: false, dono: true }, nomes: {},
   };
   const casoVazio = () => ({ id: novoId(), nome: "", autos: "", paginas: 0, pdf: null, exemplo: false, dossie: null, resumo: "", minuta: "", numero: "", tipoAto: "" });
   S.caso = casoVazio();
@@ -163,13 +163,25 @@
     }
     return blocos;
   }
+  const TABELA_TPU = () => (Array.isArray(window.TPU) ? window.TPU : []);
+  const tpusDoAto = (tipo) => AJ.tpusPorAto(TABELA_TPU(), tipo || "decisao");
+  /** Caixa destacada com as TPUs a lançar no PROJUDI, conferidas contra a tabela. */
+  function caixaTpu(tpus) {
+    const lista = AJ.conferirTpu(tpus, TABELA_TPU());
+    return h("div", { class: "tpu-box" }, h("strong", { text: "TPU a cadastrar no PROJUDI" }),
+      h("ul", null, lista.map((t) => h("li", { class: t.ok ? "" : "ruim" }, h("span", { text: t.linha }),
+        h("button", { class: "btn quiet sm", type: "button", text: "Copiar", onclick: async () => { try { await navigator.clipboard.writeText(t.linha); toast("TPU copiada."); } catch (e) { toast("Selecione e copie o texto."); } } }),
+        !t.ok ? h("span", { class: "small", text: t.sugestao ? ` Código existe com outro nome na tabela: ${t.sugestao}.` : " Não consta da tabela de TPU: confira." }) : null))));
+  }
   function md(text) {
     const frag = document.createDocumentFragment();
-    for (const b of estrutura(textoLegado(text || ""))) {
+    const { corpo, tpus } = AJ.separarTpu(text || "");
+    for (const b of estrutura(textoLegado(corpo))) {
       if (/^h\d$/.test(b.tipo)) frag.append(h(b.tipo, null, inline(b.texto)));
       else if (b.tipo === "ul") frag.append(h("ul", null, b.itens.map((x) => h("li", null, inline(x)))));
       else frag.append(h("p", { class: b.tipo === "cit" ? "cit" : b.tipo === "item" ? "num" : null }, inline(b.texto)));
     }
+    if (tpus.length) frag.append(caixaTpu(tpus));
     return frag;
   }
 
@@ -327,6 +339,7 @@
       () => x.cronologia.forEach((e) => { e.transcricoes = L(e.transcricoes).slice(0, 1).map((t) => String(t).slice(0, 200)); }),
       () => x.cronologia.forEach((e) => { e.resumo = String(e.resumo || "").slice(0, 300); }),
       () => x.provas.forEach((p) => { p.descricao = String(p.descricao || "").slice(0, 200); }),
+      () => { L(x.documentos).forEach((p) => { p.descricao = String(p.descricao || "").slice(0, 160); p.observacao = String(p.observacao || "").slice(0, 120); }); L(x.fatosAlegados).forEach((f) => { f.fato = String(f.fato || "").slice(0, 300); }); },
       () => x.cronologia.forEach((e) => { e.transcricoes = []; e.resumo = String(e.resumo || "").slice(0, 160); }),
       () => { x.cronologia = x.cronologia.filter((e) => !["certidao", "outro", "peticao_intercorrente"].includes(e.tipo)); },
     ];
@@ -378,7 +391,7 @@
       c.tipoAto = S.tipoAto !== "auto" ? S.tipoAto : (sugerido[c.dossie.atoSugerido] || "sentenca");
       const promptArea = S.prompts.find((x) => x.id === S.promptId) || null;
       const teses = AJ.selecionarTeses(S.teses, JSON.stringify(c.dossie) + " " + $("#t-instrucao").value, { area: promptArea ? promptArea.area : "" });
-      const montar = (d) => P.stage2({ dossie: d, paradigma: null, teses, precedentes: [], instrucao: $("#t-instrucao").value.trim(), tipoAto: c.tipoAto, promptArea });
+      const montar = (d) => P.stage2({ dossie: d, paradigma: null, teses, precedentes: [], instrucao: $("#t-instrucao").value.trim(), tipoAto: c.tipoAto, promptArea, tpus: tpusDoAto(c.tipoAto) });
       let prompt = montar(c.dossie);
       if (AJ.bytes(prompt) > MAX_BYTES - 5000) prompt = montar(compactar(c.dossie, MAX_BYTES - 5000 - (AJ.bytes(prompt) - AJ.bytes(JSON.stringify(c.dossie)))));
       painel("p-minuta"); S.minAba = "texto"; renderMinuta();
@@ -401,7 +414,7 @@
   async function aprofundar() {
     const c = S.caso; S.ctl = new AbortController(); renderBotoes();
     try {
-      const r = await ask(P.aprofundar(c.minuta, c.resumo), { tier: "complex", signal: S.ctl.signal, onText: ({ text }) => clear($("#min-view"), h("div", { class: "folha claude-out" }, md(text))) });
+      const r = await ask(P.aprofundar(c.minuta, c.resumo, tpusDoAto(c.tipoAto)), { tier: "complex", signal: S.ctl.signal, onText: ({ text }) => clear($("#min-view"), h("div", { class: "folha claude-out" }, md(text))) });
       S.anterior = c.minuta; aplicarTexto(r.text); salvarHistorico();
     } catch (e) { showErr($("#gerar-err"), e); }
     finally { S.ctl = null; S.minAba = "texto"; render(); }
@@ -421,9 +434,9 @@
   $("#min-tabs").addEventListener("click", (e) => { const b = e.target.closest("button[data-v]"); if (!b) return; S.minAba = b.dataset.v; renderMinuta(); });
   $("#editor").addEventListener("change", () => { if ($("#editor").value !== S.caso.minuta) { S.anterior = S.caso.minuta; S.caso.minuta = $("#editor").value; salvarHistorico(); renderAcoes(); renderBotoes(); } });
   function conferencia() {
-    const c = S.caso, fund = AJ.secao(c.minuta, "FUNDAMENTA", "DISPOSITIVO");
+    const c = S.caso, corpo = AJ.separarTpu(c.minuta).corpo, fund = AJ.fundamentacao(corpo);
     const chaves = new Set(S.teses.map((t) => AJ.chaveTese(t.tipo, t.numero)).filter(Boolean));
-    return { fora: S.teses.length ? AJ.citacoesDeTeses(c.minuta).filter((x) => !chaves.has(x.chave)) : [], densos: AJ.paragrafosDensos(fund || c.minuta), nao: !c.dossie ? [] : c.apreciados ? c.dossie.pedidos.filter((p) => !c.apreciados.includes(p.id)) : AJ.pedidosNaoApreciados(c.dossie, c.minuta), sem: c.autos ? AJ.verificarFidelidade(c.minuta, c.autos) : [] };
+    return { fora: S.teses.length ? AJ.citacoesDeTeses(c.minuta).filter((x) => !chaves.has(x.chave)) : [], densos: AJ.paragrafosDensos(fund || c.minuta), nao: !c.dossie ? [] : c.apreciados ? c.dossie.pedidos.filter((p) => !c.apreciados.includes(p.id)) : AJ.pedidosNaoApreciados(c.dossie, c.minuta), sem: c.autos ? AJ.verificarFidelidade(corpo, c.autos) : [], tpu: AJ.conferirTpu(AJ.separarTpu(c.minuta).tpus, TABELA_TPU()) };
   }
   function renderMinuta() {
     const c = S.caso, view = $("#min-view"), ed = $("#editor");
@@ -433,15 +446,18 @@
     if (S.minAba === "editar") { ed.value = c.minuta; return; }
     if (!c.minuta) return clear(view, h("div", { class: "placeholder" }, h("p", { text: c.autos ? "Autos prontos. Escolha o prompt e o tipo de ato e clique em Gerar minuta." : "Anexe os autos em PDF (ou use os autos de exemplo) para começar." }), h("p", { class: "small", text: "Etapa 1: o Claude extrai cronologia, pedidos de cada parte e provas com Mov./Arq./Pág. Etapa 2: redige relatório, fundamentação e dispositivo. Clique numa referência de página para abrir os autos nela." })));
     if (S.minAba === "texto") return clear(view, h("div", { class: "folha claude-out" }, md(c.minuta)));
-    const { densos, nao, sem, fora } = conferencia(), piso = !c.tipoAto || c.tipoAto === "sentenca" ? 14 : 0;
+    const { densos, nao, sem, fora, tpu } = conferencia(), piso = !c.tipoAto || c.tipoAto === "sentenca" ? 14 : 0;
     const linha = (rot, n, bom) => h("div", { class: "check" }, h("span", { text: rot }), h("span", { class: "pill " + (bom ? "ok" : "bad"), text: String(n) }));
     clear(view, h("div", { class: "checks" },
       linha(piso ? "Parágrafos densos na fundamentação (mínimo 14)" : "Parágrafos densos na fundamentação", densos, densos >= piso),
       c.dossie ? linha("Pedidos não apreciados", nao.length, !nao.length) : null,
       c.autos ? linha("Dados sem lastro nos autos", sem.length, !sem.length) : null,
-      S.teses.length ? linha("Súmulas e temas fora do banco de teses", fora.length, !fora.length) : null),
+      S.teses.length ? linha("Súmulas e temas fora do banco de teses", fora.length, !fora.length) : null,
+      linha("TPU indicada e conferida na tabela", tpu.filter((t) => t.ok).length, tpu.length > 0 && tpu.every((t) => t.ok))),
       h("div", { class: "notes" }, nao.map((p) => h("div", { class: "bad", text: `${p.id} — ${p.litisconsorte}: ${p.descricao}` })), sem.map((d) => h("div", { class: "bad", text: `${d.tipo}: ${d.valor} não aparece nos autos` })),
         fora.map((x) => h("div", { class: "warn", text: `${x.rotulo}: não está no banco de teses — confira número e texto antes de usar` })),
+        !tpu.length ? h("div", { class: "warn", text: "A minuta não indica a TPU do PROJUDI. No chat, use \"Indicar TPU\"." }) : null,
+        tpu.filter((t) => !t.ok).map((t) => h("div", { class: "bad", text: `TPU "${t.linha}" não consta da tabela${t.sugestao ? ` (o código pertence a: ${t.sugestao})` : ""}.` })),
         c.dossie && c.dossie.alertas.length ? h("div", { class: "warn", text: "Alertas da Etapa 1: " + c.dossie.alertas.join(" · ") }) : null),
       piso && densos < piso && c.resumo ? h("div", { class: "row" }, h("button", { class: "btn quiet sm", type: "button", disabled: !!S.ctl || !S.cap.sample, onclick: aprofundar, text: "Aprofundar fundamentação" })) : null,
       !c.autos ? h("p", { class: "muted small", text: "Anexe os autos para conferir valores, datas e números." }) : null);
@@ -463,7 +479,7 @@
     b.disabled = true; b.textContent = "Reformatando…"; S.ctl = new AbortController(); renderBotoes();
     painel("p-minuta"); S.minAba = "texto";
     try {
-      const r = await ask(P.reformatar(base, (c.resumo || "").slice(0, 60000), tesesDaMinuta()), { tier: "complex", signal: S.ctl.signal,
+      const r = await ask(P.reformatar(base, (c.resumo || "").slice(0, 60000), tesesDaMinuta(), tpusDoAto(c.tipoAto)), { tier: "complex", signal: S.ctl.signal,
         onText: ({ text }) => clear($("#min-view"), h("div", { class: "folha claude-out" }, md(text))) });
       if (r.truncated) toast("A resposta foi cortada pelo limite: confira o final antes de usar.");
       S.anterior = c.minuta; aplicarTexto(r.text); salvarHistorico();
@@ -475,7 +491,10 @@
     const b = e.currentTarget, rot = b.textContent; b.disabled = true; b.textContent = "Gerando…";
     try { await fn(); } catch (x) { toast("Não foi possível gerar o arquivo."); } finally { b.disabled = false; b.textContent = rot; }
   }
-  const semMarcadores = (t) => textoLegado(t).replace(/\s?\[P\d+\]/g, "");
+  const semMarcadores = (t) => {
+    const { corpo, tpus } = AJ.separarTpu(t);
+    return textoLegado(corpo).replace(/\s?\[P\d+\]/g, "") + (tpus.length ? "\n\nTPU A CADASTRAR NO PROJUDI (anotação do assessor):\n" + tpus.map((x) => "- " + x.linha).join("\n") : "");
+  };
   async function copiar() {
     try { await navigator.clipboard.writeText(semMarcadores(S.caso.minuta)); toast("Minuta copiada."); }
     catch (e) { S.minAba = "editar"; renderMinuta(); $("#editor").select(); toast("Selecione e copie no editor."); }
@@ -507,9 +526,14 @@
       return out;
     };
     const blocos = [];
-    for (const b of estrutura(semMarcadores(texto))) {
+    const { corpo, tpus } = AJ.separarTpu(texto);
+    for (const b of estrutura(textoLegado(corpo).replace(/\s?\[P\d+\]/g, ""))) {
       if (b.tipo === "ul") b.itens.forEach((x) => blocos.push({ tipo: "li", runs: runs("• " + x) }));
       else blocos.push({ tipo: b.tipo === "item" ? "p" : b.tipo, runs: runs(b.texto) });
+    }
+    if (tpus.length) {
+      blocos.push({ tipo: "h3", runs: [{ t: "TPU A CADASTRAR NO PROJUDI (anotação do assessor)", b: true }] });
+      tpus.forEach((x) => blocos.push({ tipo: "li", runs: [{ t: "• " + x.linha, b: true }] }));
     }
     return blocos;
   }
@@ -552,7 +576,8 @@
       const palavras = [];
       for (const r of runs) for (const w of limpa(r.t).split(/(\s+)/)) { if (!w) continue; if (/^\s+$/.test(w)) { if (palavras.length) palavras[palavras.length - 1].esp = true; continue; } palavras.push({ w, st: estilo(r, extra), esp: false }); }
       pdf.setFontSize(size);
-      const medir = (p) => { pdf.setFont("times", p.st); return pdf.getTextWidth(p.w); };
+      // Mede sem kerning: o jsPDF desconta o kerning na medida, mas desenha sem ele (nomes em MAIÚSCULAS "comiam" o espaço).
+      const medir = (p) => { pdf.setFont("times", p.st); return pdf.getStringUnitWidth(p.w, { kerning: {} }) * pdf.getFontSize() / pdf.internal.scaleFactor; };
       const espaco = (() => { pdf.setFont("times", "normal"); return pdf.getTextWidth(" "); })();
       const linhas = []; let atual = [], usado = 0, primeira = true;
       let ant = null;
@@ -667,7 +692,7 @@
     S.ctl = new AbortController(); renderBotoes(); $("#b-chat-parar").hidden = false;
     const fontes = [], nota = (t) => { const n = bolha.querySelector(".tool-note") || bolha.appendChild(h("p", { class: "tool-note" })); n.textContent = "Consultando os autos: " + t; };
     const usarFerr = !!(c.autos && S.cap.tools);
-    const contexto = P.chat({ resumo: (c.resumo || "").slice(0, 60000), minuta: c.minuta, paginas: c.paginas, nomeAutos: c.nome, ferramentas: usarFerr, autosTexto: usarFerr ? "" : autosParaIA(c.minuta + c.resumo), teses: tesesDaMinuta() });
+    const contexto = P.chat({ resumo: (c.resumo || "").slice(0, 60000), minuta: c.minuta, paginas: c.paginas, nomeAutos: c.nome, ferramentas: usarFerr, autosTexto: usarFerr ? "" : autosParaIA(c.minuta + c.resumo), teses: tesesDaMinuta(), tpus: tpusDoAto(c.tipoAto) });
     let hist = S.chat.slice(-8).map((m) => ({ role: m.role, content: m.role === "assistant" ? (separar(m.content).conversa || "Propus uma minuta atualizada.").slice(0, 3000) : m.content }));
     while (hist.length && hist[0].role !== "user") hist.shift();
     hist[0] = { role: "user", content: contexto + "\n\n---\nMENSAGEM:\n" + hist[0].content };
@@ -696,8 +721,8 @@
       h("div", { class: "row" }, h("span", null, h("strong", { text: x.titulo }), " ", h("span", { class: "tag", text: x.area })),
         h("div", { class: "row" },
           h("button", { class: "btn sm " + (S.promptId === x.id ? "" : "ghost"), type: "button", onclick: () => { S.promptId = x.id; lembrar("tj.prompt", x.id); renderSelect(); renderPrompts(); toast("Prompt ativo no Processo."); }, text: S.promptId === x.id ? "Em uso" : "Usar" }),
-          h("button", { class: "btn sm quiet", type: "button", onclick: () => editarPrompt(x), text: "Editar" }),
-          h("button", { class: "btn sm quiet", type: "button", onclick: () => confirmar($("#pr-list"), `Remover “${x.titulo}”?`, () => apagar("prompts", x.id, () => { S.prompts = S.prompts.filter((y) => y.id !== x.id); renderPrompts(); renderSelect(); })), text: "Remover" }))),
+          h("button", { class: "btn sm quiet so-dono", type: "button", onclick: () => editarPrompt(x), text: "Editar" }),
+          h("button", { class: "btn sm quiet so-dono", type: "button", onclick: () => confirmar($("#pr-list"), `Remover “${x.titulo}”?`, () => apagar("prompts", x.id, () => { S.prompts = S.prompts.filter((y) => y.id !== x.id); renderPrompts(); renderSelect(); })), text: "Remover" }))),
       h("p", { class: "muted small", text: x.texto.slice(0, 240) + (x.texto.length > 240 ? "…" : "") })))
       : [h("p", { class: "muted small", text: S.prompts.length ? "Nenhum prompt com esse filtro." : "Nenhum prompt ainda. Cadastre as instruções de cada matéria ou importe o JSON exportado do sistema antigo." })]);
   }
@@ -772,8 +797,8 @@
       h("div", { class: "row" }, h("span", null, h("span", { class: "badge", text: rotuloTese(x) }), h("span", { class: "tag", text: tribDe(x) === "Outros" ? x.fonte || "—" : tribDe(x) }), " ", h("strong", { text: x.titulo || P.nomeTese(x) }), x.sempre ? h("span", { class: "tag", text: "usar sempre" }) : null),
         h("div", { class: "row" },
           h("button", { class: "btn sm quiet", type: "button", onclick: () => copiarTese(x), text: "Copiar" }),
-          h("button", { class: "btn sm quiet", type: "button", onclick: () => editarTese(x), text: "Editar" }),
-          h("button", { class: "btn sm quiet", type: "button", onclick: () => confirmar($("#ts-list"), `Remover “${P.nomeTese(x)}”?`, () => apagar("teses", x.id, () => { S.teses = S.teses.filter((y) => y.id !== x.id); renderTeses(); })), text: "Remover" }))),
+          h("button", { class: "btn sm quiet so-dono", type: "button", onclick: () => editarTese(x), text: "Editar" }),
+          h("button", { class: "btn sm quiet so-dono", type: "button", onclick: () => confirmar($("#ts-list"), `Remover “${P.nomeTese(x)}”?`, () => apagar("teses", x.id, () => { S.teses = S.teses.filter((y) => y.id !== x.id); renderTeses(); })), text: "Remover" }))),
       h("p", { class: "cit-t", text: `“${x.texto.slice(0, 600)}${x.texto.length > 600 ? "…" : ""}”` }),
       h("div", { class: "tags" },
         x.assuntos ? h("span", { text: x.assuntos.split(/\s*,\s*/).filter(Boolean).map((a) => "#" + a.replace(/\s+/g, "")).join(" ") }) : null,
@@ -925,38 +950,98 @@
     } finally { tsCtl = null; $("#ts-prog").hidden = true; renderTeses(); }
   });
 
-  // ───────── Histórico (privado por pessoa) ─────────
+  // Tabela de TPU (somente consulta; a lista vem de tpu.js)
+  $("#tpu-q").addEventListener("input", renderTpuLista);
+  function renderTpuLista() {
+    const q = $("#tpu-q").value.trim().toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+    const todas = TABELA_TPU(), lista = todas.filter((t) => !q || `${t.nome} ${t.cnj}`.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").includes(q));
+    $("#tpu-h").textContent = `Tabela de TPU do PROJUDI · ${todas.length}`;
+    clear($("#tpu-lista"), lista.slice(0, 200).map((t) => h("div", null, h("span", { text: t.nome }), h("code", { text: "CNJ:" + t.cnj }))),
+      lista.length > 200 ? h("p", { class: "muted small", text: `Mostrando 200 de ${lista.length}. Refine a busca.` }) : null,
+      !lista.length ? h("p", { class: "muted small", text: "Nenhuma TPU com essa busca." }) : null);
+  }
+
+  // ───────── Histórico por usuário ─────────
+  // historico/<uid>/minutas/<id>: cada pessoa grava o próprio; só o dono da página lê o de todos e exclui.
   let histT;
+  const histCol = (uid) => S.cap.db.collection(`historico/${uid}/minutas`);
   function salvarHistorico() {
-    const c = S.caso;
-    if (!S.cap.db || !S.cap.uid || !c.minuta || c.exemplo) return;
+    const c = S.caso, autor = c.autor || S.cap.uid;
+    if (!S.cap.db || !autor || !c.minuta || c.exemplo) return;
     clearTimeout(histT);
     histT = setTimeout(async () => {
       try {
-        await S.cap.db.collection("data/users/" + S.cap.uid).doc("m-" + c.id).set({
+        await histCol(autor).doc("m-" + c.id).set({
           numero: c.numero || "n/i", arquivo: c.nome, paginas: c.paginas, tipoAto: c.tipoAto || "", criadoEm: c.criadoEm || (c.criadoEm = Date.now()), atualizadoEm: Date.now(),
           minuta: c.minuta.slice(0, 90000), resumo: (c.resumo || "").slice(0, 60000),
           pedidos: c.dossie ? c.dossie.pedidos.map((p) => ({ id: p.id, litisconsorte: p.litisconsorte, descricao: p.descricao })) : [],
           chat: S.chat.slice(-20).map((m) => ({ role: m.role, content: m.content.slice(0, 4000) })),
         });
+        await S.cap.db.doc(`historico/${autor}`).set({ atualizadoEm: Date.now() });
       } catch (e) { /* o histórico é conveniência: falha não interrompe o trabalho */ }
     }, 800);
   }
+  const porUsuario = new Map(); // uid → lista de minutas
+  function ouvirHistorico(uid) {
+    if (porUsuario.has(uid) || porUsuario.size >= 50) return;
+    porUsuario.set(uid, []);
+    histCol(uid).orderBy("atualizadoEm", "desc").limit(100).onSnapshot((s) => {
+      porUsuario.set(uid, s.docs.map((d) => ({ ...d.data(), _id: d.id, _autor: uid })).filter((m) => m.minuta));
+      S.historico = [...porUsuario.values()].flat().sort((a, b) => (b.atualizadoEm || 0) - (a.atualizadoEm || 0));
+      nomesDe([...porUsuario.keys()]); renderHistorico();
+    }, () => {});
+  }
+  async function nomesDe(ids) {
+    const faltam = ids.filter((id) => !(id in S.nomes));
+    if (!faltam.length || !S.cap.user || !S.cap.user.profiles) return;
+    faltam.forEach((id) => (S.nomes[id] = ""));
+    try { const ps = await S.cap.user.profiles(faltam); faltam.forEach((id) => (S.nomes[id] = (ps[id] && ps[id].name) || "")); renderHistorico(); } catch (e) { /* sem nomes: mostra "Usuário" */ }
+  }
+  const nomeUsuario = (uid) => (uid === S.cap.uid ? `${S.nomes[uid] || "Você"} (você)` : S.nomes[uid] || `Usuário ${String(uid).slice(-5)}`);
+  /** Minutas antigas ficavam em data/users/<uid> (privado): copia para o histórico novo, sem apagar as originais. */
+  async function migrarHistorico() {
+    const uid = S.cap.uid, flag = "tj.hist-migrado." + uid;
+    if (!S.cap.db || !uid || lido(flag)) return;
+    try {
+      const antigos = (await S.cap.db.collection("data/users/" + uid).limit(1000).get()).docs.filter((d) => /^m-/.test(d.id) && d.data().minuta);
+      for (const d of antigos) {
+        const ref = histCol(uid).doc(d.id);
+        if (!(await ref.get()).exists) await ref.set(d.data());
+      }
+      if (antigos.length) await S.cap.db.doc(`historico/${uid}`).set({ atualizadoEm: Date.now() });
+      lembrar(flag, "1");
+    } catch (e) { /* tenta de novo na próxima visita */ }
+  }
   $("#hist-q").addEventListener("input", renderHistorico);
+  $("#hist-u").addEventListener("change", renderHistorico);
   function renderHistorico() {
-    const box = $("#hist-list");
+    const box = $("#hist-list"), sel = $("#hist-u");
     if (!S.cap.db || !S.cap.uid) return clear(box, h("p", { class: "muted small", text: "O histórico fica disponível quando a página é aberta no claude.ai com sua conta." }));
     const q = $("#hist-q").value.trim().toLowerCase();
-    const lista = S.historico.filter((m) => !q || `${m.numero} ${m.arquivo}`.toLowerCase().includes(q));
-    clear(box, lista.length ? lista.map((m) => h("div", { class: "item" },
+    const autores = [...new Set(S.historico.map((m) => m._autor))];
+    sel.hidden = !S.cap.dono || autores.length < 2;
+    if (!sel.hidden) {
+      const atual = sel.value;
+      clear(sel, h("option", { value: "", text: `Todos os usuários · ${S.historico.length}` }), autores.map((u) => h("option", { value: u, text: `${nomeUsuario(u)} · ${S.historico.filter((m) => m._autor === u).length}` })));
+      sel.value = autores.includes(atual) ? atual : "";
+    }
+    const fu = sel.hidden ? "" : sel.value;
+    const lista = S.historico.filter((m) => (!fu || m._autor === fu) && (!q || `${m.numero} ${m.arquivo}`.toLowerCase().includes(q)));
+    const item = (m) => h("div", { class: "item" },
       h("div", { class: "row" }, h("span", null, h("strong", { text: m.numero }), " ", h("span", { class: "muted small", text: new Date(m.atualizadoEm || m.criadoEm).toLocaleString("pt-BR") })),
         h("div", { class: "row" }, h("button", { class: "btn sm", type: "button", onclick: () => reabrir(m), text: "Abrir" }),
-          h("button", { class: "btn sm quiet", type: "button", onclick: () => confirmar(box, `Excluir a minuta ${m.numero} do histórico?`, async () => { try { await S.cap.db.collection("data/users/" + S.cap.uid).doc(m._id).delete(); } catch (e) { toast("Não foi possível excluir."); } }), text: "Excluir" }))),
-      h("p", { class: "muted small", text: [m.arquivo, L(m.chat).length ? `${L(m.chat).length} mensagem(ns) no chat` : ""].filter(Boolean).join(" · ") })))
-      : [h("p", { class: "muted small", text: S.historico.length ? "Nada encontrado." : "Nenhuma minuta ainda. Cada minuta gerada de autos reais fica guardada aqui, com a conversa do chat." })]);
+          S.cap.dono ? h("button", { class: "btn sm quiet", type: "button", onclick: () => confirmar(box, `Excluir a minuta ${m.numero} de ${nomeUsuario(m._autor)}?`, async () => { try { await histCol(m._autor).doc(m._id).delete(); } catch (e) { toast("Não foi possível excluir."); } }), text: "Excluir" }) : null)),
+      h("p", { class: "muted small", text: [m.arquivo, m.tipoAto, L(m.chat).length ? `${L(m.chat).length} mensagem(ns) no chat` : ""].filter(Boolean).join(" · ") }));
+    if (!lista.length) return clear(box, h("p", { class: "muted small", text: S.historico.length ? "Nada encontrado." : "Nenhuma minuta ainda. Cada minuta gerada de autos reais fica guardada aqui, com a conversa do chat." }));
+    // Dono vê agrupado por usuário; os demais, só a própria lista.
+    if (!S.cap.dono || autores.length < 2 || fu) return clear(box, lista.map(item));
+    clear(box, autores.filter((u) => lista.some((m) => m._autor === u)).flatMap((u) => {
+      const doU = lista.filter((m) => m._autor === u);
+      return [h("div", { class: "hist-u" }, h("span", { text: nomeUsuario(u) }), h("span", { text: `${doU.length} minuta(s) · última em ${new Date(doU[0].atualizadoEm || doU[0].criadoEm).toLocaleDateString("pt-BR")}` })), ...doU.map(item)];
+    }));
   }
   function reabrir(m) {
-    novoCaso({ id: m._id.replace(/^m-/, ""), nome: "", minuta: m.minuta, resumo: m.resumo, numero: m.numero, tipoAto: m.tipoAto, criadoEm: m.criadoEm, reaberto: true,
+    novoCaso({ id: m._id.replace(/^m-/, ""), nome: "", minuta: m.minuta, resumo: m.resumo, numero: m.numero, tipoAto: m.tipoAto, criadoEm: m.criadoEm, reaberto: true, autor: m._autor,
       dossie: L(m.pedidos).length ? AJ.normalizarDossie({ numeroProcesso: m.numero, pedidos: m.pedidos }) : null });
     S.chat = L(m.chat).map((x) => ({ ...x }));
     $("#drop-t").textContent = `${m.arquivo || "Minuta salva"} — anexe o PDF para ver os autos`;
@@ -965,10 +1050,12 @@
 
   // ───────── Banco da página ─────────
   async function gravar(col, id, dados, local) {
+    if (!S.cap.dono) { toast("Somente o administrador do gabinete pode alterar isto."); return false; }
     try { if (S.cap.db) await S.cap.db.collection(col).doc(id).set({ ...dados, atualizadoEm: Date.now() }); else local(); return true; }
     catch (e) { toast(e && e.code === "invalid_argument" ? "Sem permissão para alterar isto." : "Não foi possível salvar."); return false; }
   }
   async function apagar(col, id, local) {
+    if (!S.cap.dono) return toast("Somente o administrador do gabinete pode remover isto.");
     try { if (S.cap.db) await S.cap.db.collection(col).doc(id).delete(); else local(); } catch (e) { toast("Não foi possível remover."); }
   }
   function confirmar(box, texto, acao) {
@@ -998,20 +1085,49 @@
   }
   function pill(id, txt, tom) { const el = $(id); el.textContent = txt; el.className = "pill " + (tom || ""); }
 
+  /** Claude indisponível para quem abriu a página: explica o motivo e, quando dá, pede a permissão de novo. */
+  async function diagnosticarClaude() {
+    const box = $("#gerar-err");
+    let estado = "unavailable";
+    try { const perm = await window.claude.use("permissions"); if (perm) estado = await perm.state("sample"); } catch (e) { /* segue como indisponível */ }
+    const aviso = (titulo, itens, botao) => clear(box, h("div", { class: "err", role: "alert" }, h("strong", { text: titulo }),
+      h("ul", { style: "margin:6px 0 0;padding-left:18px" }, itens.map((t) => h("li", { text: t }))), botao || null));
+    if (estado === "prompt" || estado === "denied") {
+      const pedir = h("button", { class: "btn sm", type: "button", style: "margin-top:8px", text: "Permitir que a página use o Claude", onclick: async () => {
+        try { const perm = await window.claude.use("permissions"); const r = perm && (await perm.request(["sample"])); if (r && r.sample === "granted") location.reload(); else toast("Permissão não concedida. Veja as instruções acima."); } catch (e) { toast("Não foi possível pedir a permissão."); }
+      } });
+      return aviso(estado === "denied" ? "O uso do Claude foi recusado nesta página." : "A página ainda não tem permissão para usar o Claude.", [
+        estado === "denied" ? "Abra o menu da página no claude.ai (Permissões), libere o Claude para este artefato e recarregue." : "Clique no botão abaixo e confirme em \"Permitir\".",
+        "O uso é descontado do seu próprio plano do Claude."], pedir);
+    }
+    aviso("O Claude não está disponível para a sua conta nesta página.", [
+      "Entre no claude.ai com a sua conta e abra o link da página no mesmo navegador (não em outro perfil ou aba anônima).",
+      "É preciso um plano pago do Claude (Pro, Max, Team ou Enterprise). Contas gratuitas, ou organizações que bloqueiam o uso do Claude por artefatos, não geram minutas.",
+      "Você ainda pode ver os prompts, as teses e os autos; só a geração e o chat dependem do Claude."]);
+  }
   async function iniciar() {
-    renderSelect(); renderPrompts(); renderTeses(); renderHistorico(); render();
+    renderSelect(); renderPrompts(); renderTeses(); renderTpuLista(); renderHistorico(); render();
     if (!window.claude || !window.claude.use) { pill("#st-claude", "Claude: abra no claude.ai", "bad"); pill("#st-db", "Dados: só nesta sessão", "warn"); return; }
     const [sample, db, user, downloads] = await Promise.all(["sample", "db", "user", "downloads"].map((n) => window.claude.use(n).catch(() => null)));
     Object.assign(S.cap, { sample, db, user, downloads });
     if (sample && sample.limits) { try { S.cap.tools = !!(await sample.limits()).tools; } catch (e) { S.cap.tools = false; } }
     pill("#st-claude", sample ? "Claude: disponível" : "Claude: indisponível", sample ? "ok" : "bad");
+    if (!sample) diagnosticarClaude();
     if (user) { try { S.cap.uid = await user.id(); } catch (e) { S.cap.uid = null; } }
+    // Prompts, teses e exclusão do histórico: só o dono da página (as regras do banco garantem o mesmo).
+    S.cap.dono = !db || (user ? await user.isOwner().catch(() => false) : false);
+    document.body.classList.toggle("leitor", !S.cap.dono);
+    $("#hist-p").textContent = S.cap.dono ? "Minutas e conversas de todos que usam a página, organizadas por usuário. Os autos não são guardados: para ver as páginas de novo, anexe o PDF." : "Suas minutas e conversas. Os autos não são guardados: para ver as páginas de novo, anexe o PDF.";
     if (db) {
       pill("#st-db", "Dados: sincronizados", "ok");
       const falha = () => pill("#st-db", "Dados: conexão perdida — recarregue", "bad");
       db.collection("prompts").onSnapshot((s) => { S.prompts = s.docs.map((d) => ({ ...d.data(), id: d.id })).sort((a, b) => String(a.titulo).localeCompare(String(b.titulo))); renderPrompts(); renderSelect(); }, falha);
       db.collection("teses").onSnapshot((s) => { S.teses = s.docs.map((d) => ({ ...d.data(), id: d.id })).sort((a, b) => P.nomeTese(a).localeCompare(P.nomeTese(b), "pt-BR", { numeric: true })); renderTeses(); if (S.minAba === "conf") renderMinuta(); }, falha);
-      if (S.cap.uid) db.collection("data/users/" + S.cap.uid).orderBy("atualizadoEm", "desc").limit(100).onSnapshot((s) => { S.historico = s.docs.map((d) => ({ ...d.data(), _id: d.id })).filter((m) => m.minuta); renderHistorico(); }, () => {});
+      if (S.cap.uid) {
+        migrarHistorico();
+        ouvirHistorico(S.cap.uid);
+        if (S.cap.dono) db.collection("historico").onSnapshot((s) => s.docs.forEach((d) => ouvirHistorico(d.id)), () => {});
+      }
     } else pill("#st-db", "Dados: só nesta sessão", "warn");
     renderHistorico(); render();
   }

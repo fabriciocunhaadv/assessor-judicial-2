@@ -178,6 +178,17 @@ button.ref { border: 0; cursor: pointer; }
 .item .cit-t { font-family: var(--f-doc); font-style: italic; border-left: 3px solid var(--line); padding-left: 10px; }
 .badge { display: inline-block; font: 700 11.5px/1 var(--f-mono); padding: 4px 7px; border-radius: 5px; background: var(--ink); color: var(--surface); margin-right: 6px; }
 .tags { display: flex; flex-wrap: wrap; gap: 4px 8px; font-size: 12px; color: var(--muted); }
+.leitor .so-dono, body:not(.leitor) .so-leitor { display: none !important; }
+.leitor .grid2 { grid-template-columns: minmax(0, 1fr); }
+.hist-u { font-size: 13px; font-weight: 600; color: var(--muted); margin: 10px 0 2px; display: flex; justify-content: space-between; gap: 8px; }
+.tpu-box { margin-top: 26px; padding: 12px 14px; border: 2px solid var(--accent); border-radius: 10px; background: var(--accent-soft); font: 14px/1.5 var(--f-ui); }
+.tpu-box strong { text-transform: uppercase; letter-spacing: .04em; font-size: 12.5px; color: var(--accent); }
+.tpu-box ul { margin: 8px 0 0; padding: 0; list-style: none; display: grid; gap: 6px; }
+.tpu-box li { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; font-weight: 600; }
+.tpu-box li.ruim { color: var(--bad); }
+.tpu-lista { display: grid; gap: 2px; max-height: 420px; overflow: auto; font-size: 13px; }
+.tpu-lista div { display: flex; justify-content: space-between; gap: 10px; padding: 5px 6px; border-bottom: 1px solid var(--line); }
+.tpu-lista code { font: 500 12px var(--f-mono); color: var(--muted); white-space: nowrap; }
 .check-f { display: flex; gap: 8px; align-items: flex-start; font-size: 13px; color: var(--muted); }
 .grid2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 420px); gap: 16px; align-items: start; }
 @media (max-width: 1000px) { .grid2 { grid-template-columns: minmax(0, 1fr); } }
@@ -264,6 +275,7 @@ button.ref { border: 0; cursor: pointer; }
             <button type="button" data-p="Melhore a fundamentação: aprofunde o confronto com as provas e a subsunção, sem acrescentar fatos que não estejam nos autos.">Melhorar fundamentação</button>
             <button type="button" data-p="Confira se todos os pedidos de cada parte foram julgados no dispositivo e aponte o que faltar.">Conferir pedidos</button>
             <button type="button" data-p="Revise português, clareza e coesão da minuta, sem mudar o conteúdo jurídico.">Revisar linguagem</button>
+            <button type="button" data-p="Indique no bloco ===TPU=== no final da minuta as TPUs do PROJUDI que correspondem aos comandos do dispositivo, copiadas exatamente da tabela, e devolva a minuta integral atualizada.">Indicar TPU</button>
           </div>
           <div class="row" style="align-items:stretch;flex-wrap:nowrap"><textarea id="t-msg" rows="2" style="flex:1;min-width:0" placeholder="Pergunte ou peça um ajuste (Ctrl+Enter envia)"></textarea>
             <div class="stack" style="gap:6px"><button class="btn" id="b-enviar" type="button" disabled>Enviar</button><button class="btn danger sm" id="b-chat-parar" type="button" hidden>Parar</button></div></div>
@@ -275,11 +287,11 @@ button.ref { border: 0; cursor: pointer; }
 
   <!-- PROMPTS -->
   <section role="tabpanel" id="prompts" aria-labelledby="t-prompts" hidden>
-    <div class="page-h"><h2>Prompts</h2><p>Instruções do gabinete por matéria. O prompt escolhido no Processo entra na redação da minuta.</p></div>
+    <div class="page-h"><h2>Prompts</h2><p>Instruções do gabinete por matéria. O prompt escolhido no Processo entra na redação da minuta.<span class="so-leitor"> Somente o administrador do gabinete cadastra, altera e remove prompts.</span></p></div>
     <div class="grid2">
-      <div class="panel"><header><h2 id="pr-h">Prompts</h2><div class="row"><button class="btn quiet sm" id="pr-exp" type="button">Exportar</button><label class="btn quiet sm" for="pr-imp">Importar JSON<input type="file" id="pr-imp" accept="application/json,.json" hidden></label></div></header>
+      <div class="panel"><header><h2 id="pr-h">Prompts</h2><div class="row"><button class="btn quiet sm" id="pr-exp" type="button">Exportar</button><label class="btn quiet sm so-dono" for="pr-imp">Importar JSON<input type="file" id="pr-imp" accept="application/json,.json" hidden></label></div></header>
         <div class="body"><input type="text" id="pr-q" placeholder="Filtrar prompts"><div class="items" id="pr-list"></div></div></div>
-      <div class="panel"><header><h2 id="pr-form-h">Novo prompt</h2></header><div class="body">
+      <div class="panel so-dono"><header><h2 id="pr-form-h">Novo prompt</h2></header><div class="body">
         <form id="pr-form" class="stack">
           <label class="f" for="pr-titulo">Título<input type="text" id="pr-titulo" required maxlength="160" placeholder="JEC — consumidor bancário"></label>
           <label class="f" for="pr-area">Área<select id="pr-area"></select></label>
@@ -291,9 +303,9 @@ button.ref { border: 0; cursor: pointer; }
 
   <!-- TESES -->
   <section role="tabpanel" id="teses" aria-labelledby="t-teses" hidden>
-    <div class="page-h"><h2>Banco de teses do gabinete</h2><p>Súmulas, temas, informativos, artigos de lei e entendimentos do juízo com o texto conferido. Anexe o PDF do informativo ou da lista de súmulas e o Claude organiza e lança cada item. O Claude transcreve daqui, sem redigir de memória, na minuta, no Reformatar e no chat; a Conferência aponta súmulas e temas citados que não estão no banco.</p></div>
+    <div class="page-h"><h2>Banco de teses do gabinete</h2><p>Súmulas, temas, informativos, artigos de lei e entendimentos do juízo com o texto conferido. Anexe o PDF do informativo ou da lista de súmulas e o Claude organiza e lança cada item. O Claude transcreve daqui, sem redigir de memória, na minuta, no Reformatar e no chat; a Conferência aponta súmulas e temas citados que não estão no banco.<span class="so-leitor"> Somente o administrador do gabinete cadastra, altera e remove teses.</span></p></div>
     <div class="grid2">
-      <div class="panel"><header><h2 id="ts-h">Teses</h2><div class="row"><label class="btn sm" for="ts-pdf">Anexar PDF (informativo / súmulas)<input type="file" id="ts-pdf" accept="application/pdf,.pdf" multiple hidden></label><button class="btn quiet sm" id="ts-exp" type="button">Exportar</button><label class="btn quiet sm" for="ts-imp">Importar JSON<input type="file" id="ts-imp" accept="application/json,.json" hidden></label></div></header>
+      <div class="panel"><header><h2 id="ts-h">Teses</h2><div class="row"><label class="btn sm so-dono" for="ts-pdf">Anexar PDF (informativo / súmulas)<input type="file" id="ts-pdf" accept="application/pdf,.pdf" multiple hidden></label><button class="btn quiet sm" id="ts-exp" type="button">Exportar</button><label class="btn quiet sm so-dono" for="ts-imp">Importar JSON<input type="file" id="ts-imp" accept="application/json,.json" hidden></label></div></header>
         <div class="body">
           <div class="prog" id="ts-prog" hidden style="margin:0"><div class="prog-h"><strong id="ts-prog-t">Lendo o PDF…</strong><button class="btn danger sm" id="ts-parar" type="button">Parar</button></div><div class="bar big"><i id="ts-prog-bar"></i></div><div class="small muted" id="ts-prog-s"></div></div>
           <div id="ts-err"></div>
@@ -301,7 +313,7 @@ button.ref { border: 0; cursor: pointer; }
           <div class="seg" id="ts-trib" role="radiogroup" aria-label="Tribunal"></div>
           <div class="items" id="ts-list"></div>
           <div class="row" id="ts-pag"></div></div></div>
-      <div class="panel"><header><h2 id="ts-form-h">Nova tese</h2></header><div class="body">
+      <div class="panel so-dono"><header><h2 id="ts-form-h">Nova tese</h2></header><div class="body">
         <form id="ts-form" class="stack">
           <div class="params">
             <label class="f" for="ts-tipo">Tipo<select id="ts-tipo"></select></label>
@@ -319,16 +331,20 @@ button.ref { border: 0; cursor: pointer; }
           <div class="row"><button class="btn" type="submit">Salvar</button><button class="btn quiet" type="button" id="ts-limpar">Limpar</button></div>
         </form></div></div>
     </div>
+      <div class="panel" style="margin-top:16px"><header><h2 id="tpu-h">Tabela de TPU do PROJUDI</h2><span class="small muted">Cadastrada pelo gabinete. Toda minuta termina com a TPU a lançar, escolhida desta tabela e conferida pela página.</span></header>
+      <div class="body"><input type="text" id="tpu-q" placeholder="Buscar TPU por nome ou código (ex.: gratuidade, 787, tutela)"><div class="tpu-lista" id="tpu-lista"></div></div></div>
   </section>
 
+  <!-- (tabela de TPU fica na aba Teses) -->
   <!-- HISTÓRICO -->
   <section role="tabpanel" id="historico" aria-labelledby="t-historico" hidden>
-    <div class="page-h"><h2>Histórico</h2><p>Suas minutas e conversas, visíveis só para você. Os autos não são guardados: para ver as páginas de novo, anexe o PDF.</p></div>
-    <div class="panel"><div class="body"><input type="text" id="hist-q" placeholder="Buscar por número do processo ou arquivo"><div class="items" id="hist-list"></div></div></div>
+    <div class="page-h"><h2>Histórico</h2><p id="hist-p">Suas minutas e conversas. Os autos não são guardados: para ver as páginas de novo, anexe o PDF.</p></div>
+    <div class="panel"><div class="body"><div class="row"><input type="text" id="hist-q" placeholder="Buscar por número do processo ou arquivo" style="flex:1;min-width:0"><select id="hist-u" aria-label="Filtrar por usuário" style="max-width:260px" hidden></select></div><div class="items" id="hist-list"></div></div></div>
   </section>
 </main>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="core.js"></script>
+<script src="tpu.js"></script>
 <script src="prompts.js"></script>
 <script src="app.js"></script>
