@@ -15,6 +15,7 @@ Mesa de trabalho do assessor de gabinete do TJGO, feita para rodar **dentro do c
 - **Chat com a minuta:** resumo, reanálise de documentos (o Claude busca e lê as páginas dos autos), melhorias e ajustes que você aplica ou desfaz.
 - **Reformatar:** aplica o padrão atual a uma minuta já gerada, sem reler os autos.
 - **Exportação:** Word (.docx) e PDF no padrão de peça (Times 12, justificado, recuo de 2 cm, citações recuadas 4 cm em itálico).
+- **Alerta de prompt injection:** ao anexar os autos, a página procura texto escondido em fonte branca no PDF e trechos que tentam dar ordens à IA ("se você é uma IA…", "ignore as instruções anteriores", caracteres invisíveis). Tarja vermelha com Mov./Arq./Pág. de cada trecho (ou verde, autos limpos); o Claude recebe a lista e é instruído a não obedecer e a registrar o fato no relatório.
 - **TPU do PROJUDI:** toda minuta termina com a TPU (movimento) a cadastrar no PROJUDI, escolhida da tabela em `tpu.js` (aba Teses) e conferida pela página.
 - **Prompts:** instruções por matéria, com importação do JSON exportado pelo sistema antigo.
 - **Teses:** banco de súmulas, temas, informativos, artigos e entendimentos do gabinete com o texto conferido. Anexe o PDF de um informativo ou lista de súmulas e o Claude extrai e lança cada item (texto literal, tribunal, assunto, área, página), sem duplicar o que já existe. O Claude transcreve daqui na minuta, no Reformatar e no chat; a Conferência aponta súmulas e temas citados fora do banco. Importação só acrescenta.

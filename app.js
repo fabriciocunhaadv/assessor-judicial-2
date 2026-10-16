@@ -201,7 +201,10 @@
       if (n % 4 === 0) await new Promise((r) => setTimeout(r, 0));
     }
     const { locais, cobertura } = AJ.detectarLocais(paginas);
-    return { doc, texto: AJ.cleanPages(paginas, true, cobertura >= 0.3 ? locais : null), paginas: doc.numPages, locais: cobertura >= 0.3 ? locais : [], cobertura };
+    // Texto em fonte branca (invisível a quem lê, lido pela IA): entra marcado no fim dos autos para o alerta de prompt injection.
+    let oculto = [];
+    try { oculto = await AJ.textoOcultoDoPdf(doc, pdfjs.OPS, { onProgress: (n, t) => onProgress(n, t, "oculto") }); } catch (e) { /* sem a varredura, segue a leitura */ }
+    return { doc, texto: AJ.cleanPages(paginas, true, cobertura >= 0.3 ? locais : null) + AJ.blocoTextoOculto(oculto), paginas: doc.numPages, locais: cobertura >= 0.3 ? locais : [], cobertura };
   }
   const drop = $("#drop"), fAutos = $("#f-autos");
   fAutos.addEventListener("change", () => { carregar(fAutos.files[0]); fAutos.value = ""; });
@@ -214,9 +217,9 @@
     if (file.type && file.type !== "application/pdf") return showErr($("#gerar-err"), "Selecione um arquivo PDF.");
     const bar = $("#leitura-bar"); bar.hidden = false; $("#drop-t").textContent = `Lendo ${file.name}…`;
     try {
-      const r = await lerPdf(file, (n, t) => { bar.firstElementChild.style.width = (100 * n / t) + "%"; $("#drop-s").textContent = `Página ${n} de ${t}`; });
+      const r = await lerPdf(file, (n, t, fase) => { bar.firstElementChild.style.width = (100 * n / t) + "%"; $("#drop-s").textContent = fase === "oculto" ? `Procurando texto escondido: página ${n} de ${t}` : `Página ${n} de ${t}`; });
       // Reabrindo do histórico: mantém a minuta e só acrescenta os autos.
-      const dados = { nome: file.name, autos: r.texto, paginas: r.paginas, pdf: r.doc, locais: r.locais, cobertura: r.cobertura };
+      const dados = { nome: file.name, autos: r.texto, paginas: r.paginas, pdf: r.doc, locais: r.locais, cobertura: r.cobertura, injecao: AJ.detectarInjecao(r.texto) };
       if (S.caso.minuta && !S.caso.autos && S.caso.reaberto) Object.assign(S.caso, dados);
       else novoCaso(dados);
       if (semMarcas(r.texto).trim().length < 300) showErr($("#gerar-err"), "Este PDF parece digitalizado sem texto (imagem). Aplique OCR antes de enviar.");
@@ -229,7 +232,8 @@
     const hdr = "PODER JUDICIÁRIO DO ESTADO DE GOIÁS\nComarca de Exemplo — Juizado Especial Cível";
     const pags = EXEMPLO.map((c, i) => `${hdr}\n${c}\nDocumento assinado eletronicamente por SERVIDOR FICTÍCIO\nPág. ${i + 1} de ${EXEMPLO.length}`);
     const { locais, cobertura } = AJ.detectarLocais(pags);
-    novoCaso({ nome: "Autos de exemplo (fictícios)", autos: AJ.cleanPages(pags, true, locais), paginas: pags.length, exemplo: true, locais, cobertura });
+    const autos = AJ.cleanPages(pags, true, locais);
+    novoCaso({ nome: "Autos de exemplo (fictícios)", autos, paginas: pags.length, exemplo: true, locais, cobertura, injecao: AJ.detectarInjecao(autos) });
     S.pagina = 1; render();
   });
 
@@ -315,9 +319,22 @@
   $("#b-parar").addEventListener("click", () => S.ctl && S.ctl.abort());
   const espera = (ms, signal) => new Promise((ok, no) => { const t = setTimeout(ok, ms); signal.addEventListener("abort", () => { clearTimeout(t); no({ code: "cancelled" }); }, { once: true }); });
 
+  /** Alerta de prompt injection que acompanha os prompts do caso (vazio quando os autos estão limpos). */
+  const defesa = () => AJ.defesaInjecao(S.caso.injecao);
+  function renderInjecao() {
+    const r = S.caso.injecao, box = $("#injecao");
+    if (!r || !r.verificado) { box.hidden = true; return clear(box); }
+    box.hidden = false; box.className = "inj " + (r.total ? "bad" : "ok");
+    if (!r.total) return clear(box, h("strong", { text: "✓ Autos verificados: nenhuma tentativa de dar ordens à IA" }));
+    clear(box, h("details", { open: "" }, h("summary", null, h("strong", { text: `⚠ Possível prompt injection nos autos: ${r.total} trecho(s)${r.alto ? `, ${r.alto} de risco alto` : ""}` })),
+      h("p", { class: "small", text: "Trechos que tentam dar ordens à inteligência artificial que lê o processo. O Claude foi instruído a não obedecer e a registrar o fato no relatório; a avaliação é do magistrado." }),
+      h("ul", null, r.achados.slice(0, 8).map((a) => { const onde = AJ.localInjecao(a), alvo = a.mov && a.arq && a.pag ? paginaDaCitacao(a.mov, a.arq, a.pag) : a.pdf;
+        return h("li", null, onde ? (alvo && S.caso.paginas ? h("button", { class: "ref", type: "button", title: `Abrir nos autos (página ${alvo} do PDF)`, onclick: () => irParaPagina(alvo), text: onde }) : h("span", { class: "tag", text: onde })) : null,
+          " ", h("b", { text: a.categoria }), h("q", { text: String(a.trecho).slice(0, 220) })); }))));
+  }
   async function lerBloco(bloco, i, n, signal, nivel, onText) {
     for (let tentativa = 0; ; tentativa++) {
-      try { return [await ask(P.stage1(bloco, i, n), { json: true, signal, onText })]; }
+      try { return [await ask(P.stage1(bloco, i, n) + defesa(), { json: true, signal, onText })]; }
       catch (e) {
         if (e && e.code === "invalid_json" && nivel < 2 && bloco.length > 40000) {
           const [a, b] = AJ.chunkText(bloco, Math.ceil(bloco.length / 2) + 2000);
@@ -391,7 +408,7 @@
       c.tipoAto = S.tipoAto !== "auto" ? S.tipoAto : (sugerido[c.dossie.atoSugerido] || "sentenca");
       const promptArea = S.prompts.find((x) => x.id === S.promptId) || null;
       const teses = AJ.selecionarTeses(S.teses, JSON.stringify(c.dossie) + " " + $("#t-instrucao").value, { area: promptArea ? promptArea.area : "" });
-      const montar = (d) => P.stage2({ dossie: d, paradigma: null, teses, precedentes: [], instrucao: $("#t-instrucao").value.trim(), tipoAto: c.tipoAto, promptArea, tpus: tpusDoAto(c.tipoAto) });
+      const montar = (d) => P.stage2({ dossie: d, paradigma: null, teses, precedentes: [], instrucao: $("#t-instrucao").value.trim(), tipoAto: c.tipoAto, promptArea, tpus: tpusDoAto(c.tipoAto) }) + defesa();
       let prompt = montar(c.dossie);
       if (AJ.bytes(prompt) > MAX_BYTES - 5000) prompt = montar(compactar(c.dossie, MAX_BYTES - 5000 - (AJ.bytes(prompt) - AJ.bytes(JSON.stringify(c.dossie)))));
       painel("p-minuta"); S.minAba = "texto"; renderMinuta();
@@ -414,7 +431,7 @@
   async function aprofundar() {
     const c = S.caso; S.ctl = new AbortController(); renderBotoes();
     try {
-      const r = await ask(P.aprofundar(c.minuta, c.resumo, tpusDoAto(c.tipoAto)), { tier: "complex", signal: S.ctl.signal, onText: ({ text }) => clear($("#min-view"), h("div", { class: "folha claude-out" }, md(text))) });
+      const r = await ask(P.aprofundar(c.minuta, c.resumo, tpusDoAto(c.tipoAto)) + defesa(), { tier: "complex", signal: S.ctl.signal, onText: ({ text }) => clear($("#min-view"), h("div", { class: "folha claude-out" }, md(text))) });
       S.anterior = c.minuta; aplicarTexto(r.text); salvarHistorico();
     } catch (e) { showErr($("#gerar-err"), e); }
     finally { S.ctl = null; S.minAba = "texto"; render(); }
@@ -453,7 +470,8 @@
       c.dossie ? linha("Pedidos não apreciados", nao.length, !nao.length) : null,
       c.autos ? linha("Dados sem lastro nos autos", sem.length, !sem.length) : null,
       S.teses.length ? linha("Súmulas e temas fora do banco de teses", fora.length, !fora.length) : null,
-      linha("TPU indicada e conferida na tabela", tpu.filter((t) => t.ok).length, tpu.length > 0 && tpu.every((t) => t.ok))),
+      linha("TPU indicada e conferida na tabela", tpu.filter((t) => t.ok).length, tpu.length > 0 && tpu.every((t) => t.ok)),
+      c.injecao && c.injecao.verificado ? linha("Tentativas de dar ordens à IA nos autos", c.injecao.total, !c.injecao.total) : null),
       h("div", { class: "notes" }, nao.map((p) => h("div", { class: "bad", text: `${p.id} — ${p.litisconsorte}: ${p.descricao}` })), sem.map((d) => h("div", { class: "bad", text: `${d.tipo}: ${d.valor} não aparece nos autos` })),
         fora.map((x) => h("div", { class: "warn", text: `${x.rotulo}: não está no banco de teses — confira número e texto antes de usar` })),
         !tpu.length ? h("div", { class: "warn", text: "A minuta não indica a TPU do PROJUDI. No chat, use \"Indicar TPU\"." }) : null,
@@ -479,7 +497,7 @@
     b.disabled = true; b.textContent = "Reformatando…"; S.ctl = new AbortController(); renderBotoes();
     painel("p-minuta"); S.minAba = "texto";
     try {
-      const r = await ask(P.reformatar(base, (c.resumo || "").slice(0, 60000), tesesDaMinuta(), tpusDoAto(c.tipoAto)), { tier: "complex", signal: S.ctl.signal,
+      const r = await ask(P.reformatar(base, (c.resumo || "").slice(0, 60000), tesesDaMinuta(), tpusDoAto(c.tipoAto)) + defesa(), { tier: "complex", signal: S.ctl.signal,
         onText: ({ text }) => clear($("#min-view"), h("div", { class: "folha claude-out" }, md(text))) });
       if (r.truncated) toast("A resposta foi cortada pelo limite: confira o final antes de usar.");
       S.anterior = c.minuta; aplicarTexto(r.text); salvarHistorico();
@@ -692,7 +710,7 @@
     S.ctl = new AbortController(); renderBotoes(); $("#b-chat-parar").hidden = false;
     const fontes = [], nota = (t) => { const n = bolha.querySelector(".tool-note") || bolha.appendChild(h("p", { class: "tool-note" })); n.textContent = "Consultando os autos: " + t; };
     const usarFerr = !!(c.autos && S.cap.tools);
-    const contexto = P.chat({ resumo: (c.resumo || "").slice(0, 60000), minuta: c.minuta, paginas: c.paginas, nomeAutos: c.nome, ferramentas: usarFerr, autosTexto: usarFerr ? "" : autosParaIA(c.minuta + c.resumo), teses: tesesDaMinuta(), tpus: tpusDoAto(c.tipoAto) });
+    const contexto = P.chat({ resumo: (c.resumo || "").slice(0, 60000), minuta: c.minuta, paginas: c.paginas, nomeAutos: c.nome, ferramentas: usarFerr, autosTexto: usarFerr ? "" : autosParaIA(c.minuta + c.resumo), teses: tesesDaMinuta(), tpus: tpusDoAto(c.tipoAto) }) + defesa();
     let hist = S.chat.slice(-8).map((m) => ({ role: m.role, content: m.role === "assistant" ? (separar(m.content).conversa || "Propus uma minuta atualizada.").slice(0, 3000) : m.content }));
     while (hist.length && hist[0].role !== "user") hist.shift();
     hist[0] = { role: "user", content: contexto + "\n\n---\nMENSAGEM:\n" + hist[0].content };
@@ -976,6 +994,7 @@
           minuta: c.minuta.slice(0, 90000), resumo: (c.resumo || "").slice(0, 60000),
           pedidos: c.dossie ? c.dossie.pedidos.map((p) => ({ id: p.id, litisconsorte: p.litisconsorte, descricao: p.descricao })) : [],
           chat: S.chat.slice(-20).map((m) => ({ role: m.role, content: m.content.slice(0, 4000) })),
+          ...(c.injecao && c.injecao.verificado ? { injecao: JSON.parse(JSON.stringify({ ...c.injecao, achados: c.injecao.achados.slice(0, 8).map((a) => ({ ...a, trecho: String(a.trecho).slice(0, 300) })) })) } : {}),
         });
         await S.cap.db.doc(`historico/${autor}`).set({ atualizadoEm: Date.now() });
       } catch (e) { /* o histórico é conveniência: falha não interrompe o trabalho */ }
@@ -1041,7 +1060,7 @@
     }));
   }
   function reabrir(m) {
-    novoCaso({ id: m._id.replace(/^m-/, ""), nome: "", minuta: m.minuta, resumo: m.resumo, numero: m.numero, tipoAto: m.tipoAto, criadoEm: m.criadoEm, reaberto: true, autor: m._autor,
+    novoCaso({ id: m._id.replace(/^m-/, ""), nome: "", minuta: m.minuta, resumo: m.resumo, numero: m.numero, tipoAto: m.tipoAto, criadoEm: m.criadoEm, reaberto: true, autor: m._autor, injecao: m.injecao || null,
       dossie: L(m.pedidos).length ? AJ.normalizarDossie({ numeroProcesso: m.numero, pedidos: m.pedidos }) : null });
     S.chat = L(m.chat).map((x) => ({ ...x }));
     $("#drop-t").textContent = `${m.arquivo || "Minuta salva"} — anexe o PDF para ver os autos`;
@@ -1081,7 +1100,7 @@
       const cob = c.cobertura == null ? "" : c.cobertura >= 0.3 ? ` · Mov./Arq. lidos em ${Math.round(c.cobertura * 100)}% das páginas` : " · carimbos Mov./Arq. não encontrados: citações pela folha do PDF";
       $("#drop-s").textContent = `${c.paginas} página(s)${cob}${c.exemplo ? " · fictícios" : ""}`;
     } else if (!c.minuta) { $("#drop-t").textContent = "Anexar os autos em PDF"; $("#drop-s").textContent = "PROJUDI, PJe ou eproc · lidos aqui no navegador"; }
-    renderMinuta(); renderAcoes(); renderChat(); renderPagina(); renderBusca(); renderBotoes();
+    renderInjecao(); renderMinuta(); renderAcoes(); renderChat(); renderPagina(); renderBusca(); renderBotoes();
   }
   function pill(id, txt, tom) { const el = $(id); el.textContent = txt; el.className = "pill " + (tom || ""); }
 

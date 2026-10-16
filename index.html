@@ -186,6 +186,13 @@ button.ref { border: 0; cursor: pointer; }
 .tpu-box ul { margin: 8px 0 0; padding: 0; list-style: none; display: grid; gap: 6px; }
 .tpu-box li { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; font-weight: 600; }
 .tpu-box li.ruim { color: var(--bad); }
+.inj { margin: 10px 14px 0; padding: 10px 12px; border-radius: 10px; border: 2px solid; font: 13.5px/1.45 var(--f-ui); }
+.inj.ok { border-color: var(--ok); background: var(--ok-soft); color: var(--ok); padding: 6px 12px; }
+.inj.bad { border-color: var(--bad); background: var(--bad-soft); color: var(--bad); }
+.inj p { margin: 4px 0 6px; color: var(--ink); }
+.inj summary { cursor: pointer; }
+.inj ul { margin: 0; padding-left: 18px; display: grid; gap: 4px; }
+.inj q { display: block; font-style: italic; overflow-wrap: anywhere; }
 .tpu-lista { display: grid; gap: 2px; max-height: 420px; overflow: auto; font-size: 13px; }
 .tpu-lista div { display: flex; justify-content: space-between; gap: 10px; padding: 5px 6px; border-bottom: 1px solid var(--line); }
 .tpu-lista code { font: 500 12px var(--f-mono); color: var(--muted); white-space: nowrap; }
@@ -262,6 +269,7 @@ button.ref { border: 0; cursor: pointer; }
       </div>
 
       <div class="panel on" id="p-minuta"><header><h2 id="minuta-h">Minuta</h2><div class="row" id="minuta-acts"></div></header>
+        <div class="inj" id="injecao" role="status" hidden></div>
         <div class="subtabs" id="min-tabs" role="tablist" aria-label="Minuta"><button type="button" data-v="texto" aria-selected="true">Texto</button><button type="button" data-v="conf" aria-selected="false">Conferência</button><button type="button" data-v="editar" aria-selected="false">Editar</button></div>
         <div class="scroll"><div class="body" id="min-view"></div><textarea class="editor" id="editor" hidden aria-label="Editar minuta"></textarea></div>
       </div>
