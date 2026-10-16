@@ -18,7 +18,7 @@
   const DELIBS = { acordo_total: "Acordo total", acordo_parcial: "Acordo parcial", revelia: "Revelia", contradita: "Contradita", indeferimento_perguntas: "Indeferir pergunta", diligencia: "Diligência / ofício" };
   const ABAS = { briefing: "Briefing", ata: "Ata preliminar", inquiricao: "Inquirição", deliberacoes: "Deliberações", sentenca: "Sentença em mesa", termo: "Termo de audiência" };
 
-  const A = { lista: [], atual: null, aba: "briefing", autos: "", autosNome: "", autosInfo: "", injecao: null, ctl: null, busy: "", editandoAta: false, ouvindo: false };
+  const A = { lista: [], atual: null, aba: "briefing", arquivos: [], autos: "", autosNome: "", autosInfo: "", injecao: null, ctl: null, busy: "", editandoAta: false, ouvindo: false };
   const vazia = () => ({ id: novoId(), processo: "", autor: "", reu: "", classe: "", tipo: "instrucao_julgamento", data: "", hora: "", modalidade: "", area: "civel",
     comarca: "", vara: "", juiz: "", assessor: "", status: "preparada", notas: "", briefing: null, pontos: [], testemunhas: [], ata: null, ataHtml: "",
     delibTipo: "acordo_total", delibParams: {}, deliberacao: "", sentParams: { verdict: "auto", damagesAwarded: "", groundsHighlights: "" }, sentenca: "",
@@ -85,21 +85,38 @@
   }
 
   // ───────── Autos ─────────
-  function usarAutos(texto, nome, injecao) {
+  // Vários PDFs (volumes dos autos, peças avulsas): cada um entra com o nome do arquivo e os textos são juntados na ordem.
+  function montarAutos() {
+    const arqs = A.arquivos || [];
+    if (!arqs.length) { A.autos = ""; A.autosNome = ""; A.autosInfo = ""; A.injecao = null; return; }
+    const texto = arqs.length === 1 ? arqs[0].texto : arqs.map((x, i) => `\n⟦Arquivo ${i + 1} de ${arqs.length}: ${x.nome}⟧\n${x.texto}`).join("\n");
     const r = AJ.autosParaAudiencia(texto, LIMITE_AUTOS);
-    A.autos = r.texto; A.autosNome = nome; A.injecao = injecao || AJ.detectarInjecao(texto);
+    A.autos = r.texto;
+    A.autosNome = arqs.length === 1 ? arqs[0].rotulo : `${arqs.length} arquivos · ${arqs.reduce((n, x) => n + (x.paginas || 0), 0)} página(s)`;
+    A.injecao = arqs.length === 1 && arqs[0].injecao ? arqs[0].injecao : AJ.detectarInjecao(texto);
     A.autosInfo = r.omitidas ? `${r.omitidas} de ${r.total} páginas sem relação com a audiência ficaram de fora (autos grandes)` : "autos inteiros";
-    render();
   }
-  async function anexarPdf(file) {
-    if (!file) return;
+  function usarAutos(texto, nome, injecao, paginas) {
+    A.arquivos = (A.arquivos || []).concat([{ nome, rotulo: paginas ? `${nome} · ${paginas} página(s)` : nome, texto, paginas: paginas || 0, injecao }]);
+    montarAutos(); render();
+  }
+  async function anexarPdfs(files) {
+    const lista = Array.from(files || []).filter((f) => !f.type || f.type === "application/pdf" || /\.pdf$/i.test(f.name));
+    if (!lista.length) return;
     showErr($("#aud-err"), null);
-    $("#aud-autos-s").textContent = `Lendo ${file.name}…`;
-    try {
-      const r = await lerPdf(file, (n, t, fase) => { $("#aud-autos-s").textContent = fase === "oculto" ? `Procurando texto escondido: página ${n} de ${t}` : `Lendo página ${n} de ${t}`; });
-      usarAutos(r.texto, `${file.name} · ${r.paginas} página(s)`);
-    } catch (e) { showErr($("#aud-err"), "Não foi possível ler o PDF: " + (e.message || e)); render(); }
+    const falhas = [];
+    for (const [k, file] of lista.entries()) {
+      const pre = lista.length > 1 ? `Arquivo ${k + 1} de ${lista.length} (${file.name}): ` : "";
+      $("#aud-autos-s").textContent = `${pre}lendo…`;
+      try {
+        const r = await lerPdf(file, (n, t, fase) => { $("#aud-autos-s").textContent = pre + (fase === "oculto" ? `procurando texto escondido, página ${n} de ${t}` : `página ${n} de ${t}`); });
+        A.arquivos = (A.arquivos || []).concat([{ nome: file.name, rotulo: `${file.name} · ${r.paginas} página(s)`, texto: r.texto, paginas: r.paginas }]);
+      } catch (e) { falhas.push(`${file.name}: ${e.message || e}`); }
+    }
+    montarAutos(); render();
+    if (falhas.length) showErr($("#aud-err"), "Não foi possível ler: " + falhas.join("; "));
   }
+  function tirarArquivo(i) { A.arquivos.splice(i, 1); montarAutos(); render(); }
 
   // ───────── Etapas com o Claude ─────────
   async function gerarBriefing() {
@@ -324,7 +341,7 @@
       h("span", { class: "small muted", text: [x.data ? x.data.split("-").reverse().join("/") : "", x.hora, STATUS[x.status]].filter(Boolean).join(" · ") })))
       : [h("p", { class: "muted small", text: A.lista.length ? "Nada encontrado." : "Nenhuma audiência ainda. Clique em Nova audiência." })]);
   }
-  function abrirAud(x) { A.atual = x; A.editandoAta = false; render(); }
+  function abrirAud(x) { if (!A.atual || A.atual.id !== x.id) { A.arquivos = []; montarAutos(); } A.atual = x; A.editandoAta = false; render(); }
   function renderCab() {
     const a = A.atual; if (!a) return;
     $("#aud-h").textContent = a.processo ? `Audiência · ${a.processo}` : "Audiência";
@@ -440,9 +457,11 @@
         escolha("Modalidade", "modalidade", { "": "[a definir]", presencial: "Presencial", telepresencial: "Telepresencial (Zoom)", hibrida: "Híbrida" }), campo("Comarca", "comarca", { placeholder: "Ex.: Iporá" }), campo("Vara / juízo", "vara", { placeholder: "Ex.: Juizado Especial Cível" }),
         campo("Juiz(a) que preside", "juiz"), campo("Assessor(a) que digita o termo", "assessor"), escolha("Situação", "status", STATUS, renderLista)));
     const autos = h("div", { class: "aud-autos" },
-      h("div", { style: "min-width:0;flex:1" }, h("strong", { text: A.autos ? A.autosNome : "Autos não anexados" }), h("div", { class: "small muted", id: "aud-autos-s", text: A.autos ? A.autosInfo : "Necessários para o briefing e a ata preliminar. Não são gravados: ao reabrir a audiência, anexe de novo." })),
-      S.caso && S.caso.autos ? h("button", { class: "btn quiet sm", type: "button", onclick: () => usarAutos(S.caso.autos, `${S.caso.nome} (aberto no Processo)`, S.caso.injecao), text: "Usar os autos abertos no Processo" }) : null,
-      h("label", { class: "btn quiet sm", for: "aud-pdf" }, "Anexar PDF", h("input", { type: "file", id: "aud-pdf", accept: "application/pdf", hidden: true, onchange: (e) => { anexarPdf(e.target.files[0]); e.target.value = ""; } })));
+      h("div", { style: "min-width:0;flex:1" }, h("strong", { text: A.autos ? A.autosNome : "Autos não anexados" }), h("div", { class: "small muted", id: "aud-autos-s", text: A.autos ? A.autosInfo : "Necessários para o briefing e a ata preliminar. Pode anexar vários PDFs (volumes, peças avulsas) de uma vez ou aos poucos. Não são gravados: ao reabrir a audiência, anexe de novo." }),
+        (A.arquivos || []).length > 1 ? h("ul", { class: "aud-arqs" }, A.arquivos.map((x, i) => h("li", null, h("span", { text: x.rotulo }), h("button", { class: "btn quiet sm", type: "button", title: "Tirar este arquivo", "aria-label": `Tirar ${x.nome}`, onclick: () => tirarArquivo(i), text: "×" })))) : null),
+      S.caso && S.caso.autos && !(A.arquivos || []).some((x) => x.doProcesso) ? h("button", { class: "btn quiet sm", type: "button", onclick: () => { usarAutos(S.caso.autos, `${S.caso.nome} (aberto no Processo)`, S.caso.injecao, S.caso.paginas); A.arquivos[A.arquivos.length - 1].doProcesso = true; }, text: "Usar os autos abertos no Processo" }) : null,
+      h("label", { class: "btn quiet sm", for: "aud-pdf" }, A.autos ? "Acrescentar PDFs" : "Anexar PDFs", h("input", { type: "file", id: "aud-pdf", accept: "application/pdf", multiple: true, hidden: true, onchange: (e) => { anexarPdfs(e.target.files); e.target.value = ""; } })),
+      A.autos ? h("button", { class: "btn quiet sm", type: "button", onclick: () => { A.arquivos = []; montarAutos(); render(); }, text: "Limpar autos" }) : null);
     const inj = A.injecao && A.injecao.verificado && A.autos ? h("div", { class: "inj " + (A.injecao.total ? "bad" : "ok") }, h("strong", { text: A.injecao.total ? `⚠ Possível prompt injection nos autos: ${A.injecao.total} trecho(s). O Claude foi instruído a não obedecer.` : "✓ Autos verificados: nenhuma tentativa de dar ordens à IA" }),
       A.injecao.total ? h("ul", null, A.injecao.achados.slice(0, 5).map((x) => h("li", null, h("b", { text: (AJ.localInjecao(x) || "local não identificado") + ": " }), x.categoria))) : null) : null;
     const abas = h("div", { class: "subtabs", role: "tablist" }, Object.entries(ABAS).map(([v, t]) => h("button", { type: "button", "aria-selected": String(A.aba === v), onclick: () => { A.aba = v; A.editandoAta = false; render(); }, text: t })));
@@ -451,7 +470,7 @@
     renderBusy();
   }
 
-  $("#aud-nova").addEventListener("click", () => { A.atual = vazia(); A.aba = "briefing"; if (S.caso && S.caso.numero && S.caso.numero !== "n/i") A.atual.processo = S.caso.numero; render(); });
+  $("#aud-nova").addEventListener("click", () => { A.arquivos = []; montarAutos(); A.atual = vazia(); A.aba = "briefing"; if (S.caso && S.caso.numero && S.caso.numero !== "n/i") A.atual.processo = S.caso.numero; render(); });
   $("#aud-q").addEventListener("input", renderLista);
   $("#aud-excluir").addEventListener("click", async () => {
     const a = A.atual; if (!a) return;
