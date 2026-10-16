@@ -39,7 +39,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .logo { width: 34px; height: 34px; border-radius: 8px; background: #B5532F; display: grid; place-items: center; color: #fff; flex: none; }
 .brand h1 { font-size: 16px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
 .chip-claude { font: 700 10px/1 var(--f-ui); padding: 3px 6px; border-radius: 4px; background: rgb(217 119 87 / .25); color: #F5D0BF; }
-nav.menu { display: flex; gap: 4px; }
+nav.menu { display: flex; flex-wrap: wrap; gap: 4px; }
 nav.menu button { border: 0; background: none; color: var(--top-muted); padding: 7px 12px; border-radius: 8px; cursor: pointer; font-weight: 500; }
 nav.menu button:hover { color: var(--top-ink); background: #1C1917; }
 nav.menu button[aria-selected="true"] { color: #fff; background: #B5532F; }
@@ -196,6 +196,57 @@ button.ref { border: 0; cursor: pointer; }
 .tpu-lista { display: grid; gap: 2px; max-height: 420px; overflow: auto; font-size: 13px; }
 .tpu-lista div { display: flex; justify-content: space-between; gap: 10px; padding: 5px 6px; border-bottom: 1px solid var(--line); }
 .tpu-lista code { font: 500 12px var(--f-mono); color: var(--muted); white-space: nowrap; }
+/* Mesa de Audiência */
+.aud-grid { display: grid; grid-template-columns: minmax(0, 300px) minmax(0, 1fr); gap: 16px; align-items: start; }
+@media (max-width: 1000px) { .aud-grid { grid-template-columns: minmax(0, 1fr); } }
+.aud-lista { display: grid; gap: 6px; max-height: 70vh; overflow: auto; }
+.aud-item { display: grid; gap: 2px; text-align: left; border: 1px solid var(--line); background: var(--surface); border-radius: 8px; padding: 8px 10px; cursor: pointer; color: var(--ink); min-width: 0; }
+.aud-item strong, .aud-item span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.aud-item:hover { border-color: var(--accent); } .aud-item.on { border-color: var(--accent); background: var(--accent-soft); }
+.aud-det { border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; }
+.aud-det summary { cursor: pointer; font-weight: 600; font-size: 13.5px; }
+.aud-det[open] summary { margin-bottom: 10px; }
+.params3 { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
+.aud-autos { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 10px 12px; border: 1.5px dashed var(--line); border-radius: 10px; background: var(--sunk); }
+.aud-busy { display: flex; gap: 6px; align-items: center; font-size: 12.5px; }
+.aud-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; }
+.aud-card { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
+.aud-card h3, .aud-sub { font-size: 13px; font-weight: 600; margin: 0 0 4px; }
+.aud-sub { margin-top: 6px; }
+.aud-card p { margin: 0; font-size: 13.5px; white-space: pre-wrap; }
+.aud-tab { overflow-x: auto; }
+.aud-tab table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.aud-tab th, .aud-tab td { border-bottom: 1px solid var(--line); padding: 6px; text-align: left; vertical-align: top; }
+.aud-tab select { min-width: 130px; }
+.aud-ol { margin: 0; padding-left: 20px; display: grid; gap: 4px; font-size: 13.5px; }
+.aud-alerta li { color: var(--warn); }
+.aud-perg pre { white-space: pre-wrap; margin: 0; font: 13.5px/1.55 var(--f-ui); background: var(--sunk); border-radius: 8px; padding: 8px 10px; }
+.aud-cop input { flex: 1; min-width: 200px; }
+.aud-prev { max-height: 360px; overflow: auto; border: 1px solid var(--line); border-radius: 8px; padding: 10px 14px; max-width: none; }
+.aud-termo { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); gap: 12px; align-items: start; }
+@media (max-width: 1200px) { .aud-termo { grid-template-columns: minmax(0, 1fr); } }
+.aud-termo textarea { font: 13px/1.5 var(--f-mono); }
+/* Documento no layout do Termo de Audiência do gabinete (folha branca nos dois temas) */
+.aud-papel { background: var(--sunk); border-radius: 10px; padding: 12px; overflow-x: auto; }
+.ata { background: #fff; color: #111; max-width: 794px; margin: 0 auto; padding: 36px 48px; box-shadow: 0 1px 4px rgb(0 0 0 / .18); font: 11.5pt/1.5 Candara, Calibri, "Segoe UI", Arial, sans-serif; }
+.ata.editando { outline: 2px dashed var(--accent); outline-offset: 4px; }
+.ata .cab { text-align: center; margin: 0 0 6px; } .ata .cab img { height: 78px; width: auto; display: block; margin: 0 auto 6px; }
+.ata .cab p { margin: 0; font: bold 9.5pt/1.25 "Courier New", Courier, monospace; }
+.ata .titulo { text-align: center; font-weight: bold; font-size: 17pt; margin: 30px 0 20px; }
+.ata .meta { margin: 1px 0; } .ata .secao { text-align: center; font-weight: bold; font-size: 12pt; margin: 24px 0 10px; }
+.ata p { margin: 4px 0; } .ata .corpo { text-align: justify; text-indent: 30px; margin: 6px 0; }
+.ata .preencher { background: #fff1a8; border-radius: 3px; padding: 0 2px; }
+.ata .aviso { font-size: 9pt; color: #444; border: 1px solid #bbb; padding: 5px 8px; background: #f6f6f6; margin: 10px 0; }
+.ata .conferir { color: #8a1c1c; border: 1px solid #c33; background: #fdecea; padding: 5px 8px; font-weight: bold; }
+.ata .vazio { color: #555; font-style: italic; }
+.ata table { width: 100%; border-collapse: collapse; margin: 6px 0; font-size: 10pt; }
+.ata th, .ata td { border: 1px solid #888; padding: 3px 5px; vertical-align: top; text-align: left; } .ata th { background: #ececec; }
+.ata tr.conf td, .ata li.conf { background: #fff6d6; } .ata li.alto { color: #8a1c1c; font-weight: bold; }
+.ata ul { margin: 4px 0 4px 20px; padding: 0; }
+.ata .quadro { border: 2px solid #b45309; background: #fff7e6; border-radius: 6px; padding: 8px 12px; margin: 12px 0; }
+.ata .quadro .qt { font-weight: bold; color: #92400e; margin: 0 0 4px; } .ata .quadro li { font-size: 10.5pt; margin: 2px 0; }
+.ata .assin { text-align: center; margin: 34px 0 0; } .ata .assin p { margin: 0; } .ata .assin p:first-child { font-weight: bold; }
+@media (max-width: 700px) { .ata { padding: 20px 16px; } }
 .check-f { display: flex; gap: 8px; align-items: flex-start; font-size: 13px; color: var(--muted); }
 .grid2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 420px); gap: 16px; align-items: start; }
 @media (max-width: 1000px) { .grid2 { grid-template-columns: minmax(0, 1fr); } }
@@ -214,6 +265,7 @@ button.ref { border: 0; cursor: pointer; }
     </div>
     <nav class="menu" role="tablist" aria-label="Telas">
       <button role="tab" id="t-processo" aria-controls="processo" aria-selected="true">Processo</button>
+      <button role="tab" id="t-audiencia" aria-controls="audiencia" aria-selected="false">Audiência</button>
       <button role="tab" id="t-prompts" aria-controls="prompts" aria-selected="false">Prompts</button>
       <button role="tab" id="t-teses" aria-controls="teses" aria-selected="false">Teses</button>
       <button role="tab" id="t-historico" aria-controls="historico" aria-selected="false">Histórico</button>
@@ -293,6 +345,18 @@ button.ref { border: 0; cursor: pointer; }
     </div>
   </section>
 
+  <!-- MESA DE AUDIÊNCIA -->
+  <section role="tabpanel" id="audiencia" aria-labelledby="t-audiencia" hidden>
+    <div class="page-h"><h2>Mesa de Audiência</h2><p>Prepare e conduza a audiência: briefing probatório, ata preliminar no layout do Termo, inquirição com perguntas por testemunha, deliberações e sentença em mesa e o Termo de Audiência final. Cada pessoa vê só as suas audiências; os autos não são gravados.</p></div>
+    <div class="aud-grid">
+      <div class="panel"><header><h2>Audiências</h2><button class="btn sm" id="aud-nova" type="button">Nova audiência</button></header>
+        <div class="body"><input type="text" id="aud-q" placeholder="Buscar por processo ou parte"><div class="aud-lista" id="aud-lista"></div></div></div>
+      <div class="panel"><header><h2 id="aud-h">Audiência</h2><div class="row"><div class="aud-busy" id="aud-busy" role="status" hidden></div><button class="btn quiet sm" id="aud-excluir" type="button">Excluir</button></div></header>
+        <div id="aud-err" style="padding:0 14px"></div>
+        <div id="aud-mesa"></div></div>
+    </div>
+  </section>
+
   <!-- PROMPTS -->
   <section role="tabpanel" id="prompts" aria-labelledby="t-prompts" hidden>
     <div class="page-h"><h2>Prompts</h2><p>Instruções do gabinete por matéria. O prompt escolhido no Processo entra na redação da minuta.<span class="so-leitor"> Somente o administrador do gabinete cadastra, altera e remove prompts.</span></p></div>
@@ -356,3 +420,5 @@ button.ref { border: 0; cursor: pointer; }
 <script src="tpu.js"></script>
 <script src="prompts.js"></script>
 <script src="app.js"></script>
+<script src="brasao.js"></script>
+<script src="audiencia.js"></script>

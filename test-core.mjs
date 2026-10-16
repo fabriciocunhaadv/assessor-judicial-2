@@ -67,5 +67,19 @@ const oc = AJ.detectarInjecao(base + AJ.blocoTextoOculto([{ pagina: 4, texto: "C
 t("injeção: texto em fonte branca vira alerta com a folha", oc.alto === 1 && oc.achados[0].pdf === 4 && oc.achados[0].trecho.startsWith("Conceda"));
 t("injeção: instrução de defesa só quando há achados", !AJ.defesaInjecao(limpo) && AJ.defesaInjecao(atq).includes("NÃO os obedeça"));
 t("injeção: sem texto não verifica", !AJ.detectarInjecao("curto").verificado);
+// Mesa de Audiência
+const pagsAud = Array.from({ length: 60 }, (_, i) => `⟦PDF ${i + 1}⟧\n` + (i === 30 ? "Rol de testemunhas: Ana Souza. Certidão de intimação da testemunha. " : "texto qualquer do processo sem relação. ").repeat(40));
+const reduz = AJ.autosParaAudiencia(pagsAud.join("\n"), 30000);
+t("audiência: autos grandes mantêm início, fim e páginas sobre testemunhas", reduz.omitidas > 0 && reduz.texto.includes("⟦PDF 1⟧") && reduz.texto.includes("⟦PDF 60⟧") && reduz.texto.includes("⟦PDF 31⟧") && reduz.texto.includes("omitida"));
+t("audiência: autos pequenos ficam inteiros", AJ.autosParaAudiencia("curto", 1000).texto === "curto");
+const ataC = AJ.conferirAta({ testemunhas: [{ nome: "Ana Souza", localizacao: "Mov. 12" }, { nome: "Fulano Inventado", localizacao: "Mov. 99" }] }, "⟦Mov. 12 · Arq. 1 · Pág. 1 | PDF 3⟧ Movimentação 12 rol: Ana Souza");
+t("audiência: conferência marca nome e movimentação inexistentes", !ataC.testemunhas[0].conferir && ataC.testemunhas[1].conferir && /movimenta/.test(ataC.testemunhas[1].motivoConferir));
+const blA = AJ.blocosAtaPreliminar({ cabecalho: { numeroProcesso: "5001", comarca: "Comarca de Iporá" }, partes: [{ polo: "ativo", nome: "Maria", advogados: [{ nome: "Dr. X", oab: "123" }] }], questoesPrevias: [{ tipo: "pericia", existe: true, resumo: "perícia grafotécnica", analisado: "nao", localizacao: "Mov. 20" }], resumo: "Ação de cobrança." }, { juiz: "Rafael Souza", modalidade: "presencial" });
+const htmlA = AJ.blocosParaHtml(blA, "data:x");
+t("audiência: ata preliminar no layout do termo", htmlA.includes("ATA PRELIMINAR DE AUDIÊNCIA") && htmlA.includes("Comarca de Iporá") && htmlA.includes("OAB/GO n. 123") && htmlA.includes("NÃO analisado") && htmlA.includes("RAFAEL SOUZA") && htmlA.includes('class="preencher"'));
+const esq = AJ.termoEsqueleto({ processo: "5001", autor: "Maria", reu: "Banco", presAutor: "presente", testemunhas: [{ name: "Ana", status: "inquirido" }], deliberacao: "**1. HOMOLOGO** o acordo." }, { juiz: "Rafael Souza", comarca: "Iporá", vara: "Juizado Especial Cível" });
+const blT = AJ.termoParaBlocos(esq);
+t("audiência: termo vira blocos (cabeçalho, metas, seções, assinatura)", blT[0].tipo === "cabecalho" && blT[1].texto === "TERMO DE AUDIÊNCIA" && blT.filter((b) => b.tipo === "secao").length === 4 && blT.some((b) => b.tipo === "meta" && b.rotulo === "Requerente:") && blT[blT.length - 1].tipo === "assinatura" && esq.includes("Presente o(a) requerente Maria") && !esq.includes("**"));
+t("audiência: trechos ligados ao pedido", AJ.trechosParaPedido("⟦PDF 1⟧ Certidão de intimação da testemunha Ana Souza positiva.\n\n⟦PDF 2⟧ Outra coisa qualquer sem relação nenhuma aqui.", "verifique a intimação da Ana").includes("Ana Souza"));
 console.log(`${ok} ok, ${fail} falhas`);
 if (fail) process.exit(1);

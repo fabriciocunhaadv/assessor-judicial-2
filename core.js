@@ -410,6 +410,223 @@ ${lista}\n`;
   }
   const blocoTextoOculto = (lista) => (lista || []).map((x) => `\n${MARCA_OCULTO} — pág. ${x.pagina} do arquivo]: ${x.texto.slice(0, 600)}\n`).join("");
 
+  // ───────── Mesa de Audiência ─────────
+  // Autos grandes: mantém o início (inicial), o fim (atos recentes) e as páginas sobre audiência, testemunhas, citação e intimação;
+  // as demais saem inteiras (nada é resumido) e o corte é avisado no próprio texto.
+  const TERMOS_AUD = /audi[eê]ncia|testemunh|rol de|intima|cita[çc]|mandado|oficial de justi|aviso de recebimento|\bAR\b|certid|depoimento|per[ií]cia|tutela|adiament|redesign|videoconfer|telepresencial|preposto|acordo|concilia|revelia|contesta|r[eé]plica|preliminar|prova/gi;
+  function autosParaAudiencia(texto, limite = 200000) {
+    const t = String(texto || "");
+    if (t.length <= limite) return { texto: t, omitidas: 0, total: 0 };
+    const pags = []; let ini = 0;
+    for (const m of t.matchAll(/⟦[^⟧]*⟧/g)) { if (m.index > ini) pags.push(t.slice(ini, m.index)); ini = m.index; }
+    pags.push(t.slice(ini));
+    if (pags.length < 3) return { texto: t.slice(0, limite / 2) + "\n\n[... trecho do meio omitido por limite de tamanho ...]\n\n" + t.slice(-limite / 2), omitidas: 0, total: 0, cortado: true };
+    // início (até 6 páginas ou 15% do limite) e fim (até 15 páginas ou 25%); o resto do espaço vai para as páginas sobre a audiência
+    const fixas = new Set(); let ac = 0;
+    for (let i = 0; i < Math.min(6, pags.length) && ac + pags[i].length <= limite * 0.15; i++) { fixas.add(i); ac += pags[i].length; }
+    ac = 0;
+    for (let i = pags.length - 1; i >= Math.max(0, pags.length - 15) && ac + pags[i].length <= limite * 0.25; i--) { fixas.add(i); ac += pags[i].length; }
+    if (!fixas.size) fixas.add(0);
+    const nota = pags.map((p, i) => ({ i, n: (p.match(TERMOS_AUD) || []).length / Math.max(1, p.length / 2000) }));
+    let usado = [...fixas].reduce((a, i) => a + pags[i].length, 0);
+    const ficam = new Set(fixas);
+    for (const x of nota.filter((x) => !fixas.has(x.i) && x.n > 0).sort((a, b) => b.n - a.n)) { if (usado + pags[x.i].length > limite) continue; ficam.add(x.i); usado += pags[x.i].length; }
+    let out = "", pulou = 0, omitidas = 0;
+    pags.forEach((p, i) => { if (ficam.has(i)) { if (pulou) out += `\n[... ${pulou} página(s) sem relação com a audiência omitida(s) ...]\n`; pulou = 0; out += p; } else { pulou++; omitidas++; } });
+    if (pulou) out += `\n[... ${pulou} página(s) omitida(s) ...]\n`;
+    return { texto: out.length > limite * 1.15 ? out.slice(0, limite) : out, omitidas, total: pags.length };
+  }
+  /** Trechos dos autos ligados a um pedido (copiloto da ata), até ~20 mil caracteres, na ordem dos autos. */
+  function trechosParaPedido(autos, pedido, max = 20000) {
+    const stop = new Set(["para", "como", "sobre", "esta", "esse", "essa", "isso", "onde", "qual", "quais", "pelo", "pela", "pelos", "pelas", "consta", "autos", "verifique", "confira"]);
+    const termos = [...new Set((semAcento(pedido).match(/[a-z0-9]{4,}/g) || []).filter((x) => !stop.has(x)))];
+    if (!termos.length) return "";
+    const pedacos = String(autos || "").split(/\n{2,}|(?=⟦)/).filter((x) => x.trim().length > 40);
+    const esc = pedacos.map((x, idx) => { const n = semAcento(x); return { idx, x, sc: termos.filter((t) => n.includes(t)).length }; }).filter((o) => o.sc > 0).sort((a, b) => b.sc - a.sc).slice(0, 30);
+    let total = 0; const fica = [];
+    for (const o of esc) { if (total + Math.min(o.x.length, 2500) > max) continue; fica.push(o); total += Math.min(o.x.length, 2500); }
+    return fica.sort((a, b) => a.idx - b.idx).map((o) => o.x.trim().slice(0, 2500)).join("\n---\n");
+  }
+  /** Conferência por regras fixas: a movimentação citada existe nos autos? o nome aparece no texto? Marca "conferir". */
+  function conferirAta(ata, autos) {
+    const nt = semAcento(autos).replace(/\s+/g, " ");
+    const movExiste = (loc) => { const m = /mov\.?\s*(\d+)/i.exec(String(loc || "")); return !m || new RegExp(`(?:movimenta[a-z]*|mov\\.?|evento)\\s*(?:n[o.]?\\s*)?[:\\-]?\\s*${m[1]}\\b`).test(nt); };
+    const nomeExiste = (nome) => { const n = semAcento(nome).replace(/\s+/g, " ").trim(); if (n.length < 5) return true; const w = n.split(" ").filter((x) => x.length > 2); return !w.length || w.every((x) => nt.includes(x)) || nt.includes(n); };
+    const marca = (o, nome, loc) => { if (!o) return; const mot = []; if (loc && !movExiste(loc)) mot.push("a movimentação indicada não aparece nos autos"); if (nome && !nomeExiste(nome)) mot.push("o nome não aparece nos autos"); if (mot.length) { o.conferir = true; o.motivoConferir = mot.join("; "); } };
+    const arr = (x) => (Array.isArray(x) ? x : []);
+    arr(ata.partes).forEach((x) => marca(x, x && x.nome, x && x.localizacao));
+    arr(ata.testemunhas).forEach((x) => { marca(x, x && x.nome, x && x.localizacao); if (x && !x.conferir) marca(x, null, x.localizacaoIntimacao); });
+    arr(ata.citacoesIntimacoes).forEach((x) => marca(x, x && x.destinatario, x && x.localizacao));
+    arr(ata.pedidosAudiencia).forEach((x) => marca(x, null, x && x.localizacao));
+    arr(ata.pontosAtencao).forEach((x) => marca(x, null, x && x.localizacao));
+    arr(ata.questoesPrevias).forEach((x) => { if (x && x.existe) marca(x, null, x.localizacao); });
+    return ata;
+  }
+  // Layout do Termo de Audiência do gabinete: brasão, cabeçalho em Courier, título, linhas "rótulo: valor", seções centralizadas.
+  const NC_AUD = "não consta nos autos";
+  const vA = (x) => (x && String(x).trim() ? String(x).trim() : NC_AUD);
+  const locA = (x) => (x && String(x).trim() ? String(x).trim() : "localização não identificada");
+  const apenasComarca = (c) => String(c || "").replace(/^\s*comarca\s+de\s+/i, "").replace(/\s*[\/-]\s*GO\s*$/i, "").trim();
+  const dataBr = (iso) => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso || "")); return m ? `${m[3]}/${m[2]}/${m[1]}` : String(iso || ""); };
+  const horaBr = (x) => { const m = /^(\d{1,2})[:hH](\d{2})/.exec(String(x || "")); return m ? `${m[1].padStart(2, "0")}h${m[2]}min` : String(x || ""); };
+  const listaE = (xs) => (xs.length <= 1 ? xs.join("") : xs.slice(0, -1).join(", ") + " e " + xs[xs.length - 1]);
+  const tr_ = (x) => String(x || "").trim();
+  const ponto = (x) => (/[.!?]$/.test(x) ? x : x + ".");
+  const ROT_POLO = { ativo: "Requerente", passivo: "Requerido", terceiro: "Terceiro Interessado", ministerio_publico: "Ministério Público" };
+  const RESULT_CIT = { positiva: "Positiva", negativa: "Negativa", edital: "Por edital", hora_certa: "Hora certa", aguardando: "Aguardando cumprimento", nao_localizada: "Não localizada nos autos" };
+  const SIT_INT = { intimada: "Intimada", nao_intimada: "Não intimada", negativa: "Intimação negativa", aguardando: "Aguardando", nao_localizada: "Não localizada nos autos" };
+  const INDICADA = { autor: "Autor", reu: "Réu", outro: "Outro" };
+  const ROT_QUESTAO = { depoimento_pessoal: "Depoimento pessoal da parte contrária", pericia: "Perícia / prova técnica", tutela_urgencia: "Tutela de urgência / evidência", adiamento_redesignacao: "Adiamento / redesignação", questao_nao_analisada: "Outras questões ainda não analisadas", prova_documental_pendente: "Documentos / manifestações pendentes" };
+  const ANALISE = { sim: "já analisado", nao: "NÃO analisado", parcial: "analisado em parte" };
+  const advTxt = (p) => (p.advogados || []).filter((a) => a && a.nome).map((a) => `${a.nome}${a.oab ? ` – OAB/${/^[A-Z]{2}\b/.test(String(a.oab).trim()) ? String(a.oab).trim().replace(/^([A-Z]{2})\s*/, "$1 n. ") : "GO n. " + a.oab}` : ""}`).join(" e ");
+  const modoTxt = (m) => m === "presencial" ? "presencial" : m === "telepresencial" || m === "hibrida" ? "telepresencial, por meio do aplicativo Zoom Meetings, nos termos da Resolução CNJ n. 354/2020" : "[telepresencial, por meio do aplicativo Zoom Meetings, nos termos da Resolução CNJ n. 354/2020 / presencial]";
+  const ENCERRA = (assessor) => `[Pelo MM. Juiz foram dispensadas as assinaturas, por se tratar de audiência realizada por videoconferência.] Facultam-se às partes indicar eventual desconformidade ou irregularidade no conteúdo do presente termo de audiência, no prazo de 2 (dois) dias, contados da disponibilização deste no sistema PJD/TJGO. Encerrado o ato. Eu, ${assessor || "[nome do assessor]"}, Assessor de Juiz de Direito, o digitei.`;
+  const cabecalhoAud = (comarca, vara) => ({ tipo: "cabecalho", linhas: ["PODER JUDICIÁRIO", comarca ? `Comarca de ${comarca}` : "Comarca de [comarca]", vara || "[vara / juízo]", "Sala de Audiências"] });
+
+  /** Ata preliminar (dados do Claude + contexto do gabinete) em blocos de layout. */
+  function blocosAtaPreliminar(d, ctx = {}) {
+    const b = [], c = d.cabecalho || {}, partes = Array.isArray(d.partes) ? d.partes : [];
+    const comarca = apenasComarca(ctx.comarca || c.comarca), vara = tr_(ctx.vara || c.vara);
+    b.push(cabecalhoAud(comarca, vara), { tipo: "titulo", texto: "ATA PRELIMINAR DE AUDIÊNCIA" });
+    b.push({ tipo: "paragrafo", destaque: "aviso", texto: "Documento de apoio ao magistrado, elaborado a partir dos autos. Os campos entre [colchetes] são para completar durante o ato; os itens “conferir” devem ser verificados nos autos." });
+    if (d.alertaInjecao && d.alertaInjecao.total) b.push({ tipo: "paragrafo", destaque: "conferir", texto: `ALERTA: possível tentativa de manipular a IA nos autos (${d.alertaInjecao.total} trecho(s)). ` + d.alertaInjecao.achados.slice(0, 5).map((a) => `${localInjecao(a) || "local não identificado"}: “${String(a.trecho).slice(0, 120)}”`).join("; ") });
+    const dataTxt = tr_(c.dataHoraAudiencia) || (ctx.data ? `${dataBr(ctx.data)}${ctx.hora ? ", às " + horaBr(ctx.hora) : ""}` : "[data e hora]");
+    b.push({ tipo: "meta", rotulo: "Data:", valor: dataTxt }, { tipo: "meta", rotulo: "Número do Processo:", valor: vA(c.numeroProcesso) }, { tipo: "meta", rotulo: "Natureza:", valor: vA(c.assunto || c.classe) });
+    if (tr_(c.valorCausa)) b.push({ tipo: "meta", rotulo: "Valor da causa:", valor: tr_(c.valorCausa) });
+    if (!partes.length) b.push({ tipo: "meta", rotulo: "Partes:", valor: NC_AUD });
+    for (const p of partes) {
+      b.push({ tipo: "meta", rotulo: (ROT_POLO[p.polo] || "Parte") + ":", valor: [vA(p.nome), tr_(p.qualificacao) ? `(${tr_(p.qualificacao)})` : ""].filter(Boolean).join(" ") + (p.conferir ? " [conferir]" : "") });
+      const adv = advTxt(p); if (adv) b.push({ tipo: "meta", rotulo: (p.advogados || []).length > 1 ? "Advogados:" : p.polo === "ministerio_publico" ? "Promotor:" : "Advogado:", valor: adv });
+    }
+    b.push({ tipo: "secao", texto: "RESUMO DO PROCESSO" }, { tipo: "paragrafo", destaque: "corpo", texto: vA(d.resumo) });
+    const q = Array.isArray(d.questoesPrevias) ? d.questoesPrevias : [];
+    if (q.length) b.push({ tipo: "quadro", titulo: "ATENÇÃO ANTES DA AUDIÊNCIA — pedidos e questões a verificar", itens: Object.keys(ROT_QUESTAO).map((t) => {
+      const x = q.find((y) => y && y.tipo === t), rot = ROT_QUESTAO[t];
+      if (!x || !x.existe) return { texto: `${rot}: nenhum pedido localizado nos autos.` };
+      const an = ANALISE[String(x.analisado || "").toLowerCase()] || "";
+      return { alerta: String(x.analisado || "").toLowerCase() !== "sim", conferir: x.conferir, texto: `${rot}: ` + [`${tr_(x.resumo) || "pedido localizado"}${x.requerente === "autor" ? " (autor)" : x.requerente === "reu" ? " (réu)" : ""}`, an && `— ${an}`, tr_(x.decisao) ? `Decisão: ${tr_(x.decisao)}` : "", `(${locA(x.localizacao)})`, x.conferir ? "[conferir]" : ""].filter(Boolean).join(" ") };
+    }) });
+    const tes = Array.isArray(d.testemunhas) ? d.testemunhas : [];
+    b.push({ tipo: "secao", texto: "TESTEMUNHAS INDICADAS" });
+    if (!tes.length) b.push({ tipo: "paragrafo", destaque: "vazio", texto: "Nenhuma testemunha arrolada nos autos." });
+    else b.push({ tipo: "tabela", colunas: ["Testemunha", "Indicada por", "Onde foi indicada", "Intimação", "Onde consta a intimação"], linhas: tes.map((t) => ({ conferir: t.conferir, celulas: [vA(t.nome) + (t.qualificacao ? ` — ${t.qualificacao}` : ""), INDICADA[t.indicadaPor] || vA(t.indicadaPor), locA(t.localizacao), (SIT_INT[t.situacaoIntimacao] || NC_AUD) + (t.dataIntimacao ? ` (${t.dataIntimacao})` : ""), locA(t.localizacaoIntimacao) + (t.conferir ? " [conferir]" : "")] })) });
+    const cit = Array.isArray(d.citacoesIntimacoes) ? d.citacoesIntimacoes : [];
+    b.push({ tipo: "secao", texto: "CITAÇÕES E INTIMAÇÕES" });
+    if (!cit.length) b.push({ tipo: "paragrafo", destaque: "vazio", texto: NC_AUD });
+    else b.push({ tipo: "tabela", colunas: ["Destinatário", "Ato", "Resultado", "Data", "Onde consta"], linhas: cit.map((x) => ({ conferir: x.conferir, celulas: [vA(x.destinatario) + (x.papel ? ` (${x.papel})` : ""), x.ato === "citacao" ? "Citação" : x.ato === "intimacao" ? "Intimação" : vA(x.ato), (RESULT_CIT[x.resultado] || NC_AUD) + (x.observacao ? ` — ${x.observacao}` : ""), vA(x.data), locA(x.localizacao) + (x.conferir ? " [conferir]" : "")] })) });
+    const ped = Array.isArray(d.pedidosAudiencia) ? d.pedidosAudiencia : [];
+    b.push({ tipo: "secao", texto: "PEDIDOS RELACIONADOS À AUDIÊNCIA" });
+    if (!ped.length) b.push({ tipo: "paragrafo", destaque: "vazio", texto: "Nenhum pedido relacionado à audiência localizado nos autos." });
+    else b.push({ tipo: "tabela", colunas: ["Pedido", "Requerente", "Resumo", "Decisão", "Onde consta"], linhas: ped.map((x) => ({ conferir: x.conferir, celulas: [vA(x.tipo), vA(x.requerente) + (x.data ? ` (${x.data})` : ""), vA(x.resumo), tr_(x.decisao) || "sem decisão localizada", locA(x.localizacao) + (x.conferir ? " [conferir]" : "")] })) });
+    const at = Array.isArray(d.pontosAtencao) ? d.pontosAtencao : [];
+    b.push({ tipo: "secao", texto: "PONTOS DE ATENÇÃO" });
+    if (!at.length) b.push({ tipo: "paragrafo", destaque: "vazio", texto: "Nenhum ponto de atenção identificado." });
+    else b.push({ tipo: "lista", itens: at.map((p) => ({ nivel: p.nivel, conferir: p.conferir, texto: `${p.nivel === "alto" ? "[ALTO] " : p.nivel === "medio" ? "[MÉDIO] " : ""}${vA(p.texto)} (${locA(p.localizacao)})${p.conferir ? " [conferir: " + (p.motivoConferir || "") + "]" : ""}` })) });
+    const pc = Array.isArray(d.pontosControvertidos) ? d.pontosControvertidos : [];
+    b.push({ tipo: "secao", texto: "PONTOS CONTROVERTIDOS E O QUE FALTA PROVAR" });
+    if (pc.length) b.push({ tipo: "lista", itens: pc.map((x) => ({ texto: String(x) })) }); else b.push({ tipo: "paragrafo", destaque: "vazio", texto: NC_AUD });
+    b.push({ tipo: "paragrafo", destaque: "corpo", texto: "O que falta provar: " + vA(d.faltaProvar) });
+    // minuta do termo, para completar durante o ato
+    const juiz = tr_(c.juizDesignouAudiencia).replace(/^(excelent[ií]ssimo|exmo\.?)\s+/i, "") || tr_(ctx.juiz);
+    const juizN = juiz ? (/^dr/i.test(juiz) ? juiz : `Dr. ${juiz}`) : "[nome do Juiz de Direito]";
+    const lp = [`[Presente presencialmente na sala de audiências] o Juiz de Direito, ${juizN}.`];
+    for (const p of partes) { const rot = (ROT_POLO[p.polo] || "parte").toLowerCase(), adv = advTxt(p); lp.push(ponto(`[Presente/Ausente] ${rot === "requerente" || rot === "requerido" ? "o(a) " : ""}${rot} ${vA(p.nome)}${adv ? `, [acompanhado(a) de seu(sua) advogado(a), ${adv}]` : ""}`)); }
+    const tn = tes.filter((t) => t.nome); if (tn.length) lp.push(`Testemunhas indicadas: ${listaE(tn.map((t) => String(t.nome)))} [presentes/ausentes].`);
+    b.push({ tipo: "secao", texto: "PRESENTES" }, { tipo: "paragrafo", destaque: "corpo", texto: lp.join(" ") });
+    b.push({ tipo: "secao", texto: "OCORRÊNCIAS" }, { tipo: "paragrafo", destaque: "corpo", texto: `Declarada aberta a audiência, na forma da lei, o ato foi realizado de modo ${modoTxt(ctx.modalidade)}. Na sequência, o Magistrado advertiu as partes acerca da vedação à divulgação não autorizada dos registros audiovisuais a pessoas estranhas ao processo.` });
+    const pend = ped.filter((x) => !tr_(x.decisao));
+    if (pend.length) b.push({ tipo: "paragrafo", destaque: "corpo", texto: `Requerimentos constantes dos autos ainda sem decisão: ${pend.map((x) => `${vA(x.tipo)} (${vA(x.requerente)}, ${locA(x.localizacao)})`).join("; ")}.` });
+    b.push({ tipo: "paragrafo", destaque: "corpo", texto: "[Registrar as ocorrências: oitivas, requerimentos e decisões incidentais.]" });
+    b.push({ tipo: "secao", texto: "DELIBERAÇÕES" }, { tipo: "paragrafo", destaque: "corpo", texto: "Pelo MM. Juiz de Direito foi proferida a seguinte D E C I S Ã O:" }, { tipo: "paragrafo", destaque: "corpo", texto: "[Texto da decisão.]" });
+    b.push({ tipo: "secao", texto: "ENCERRAMENTO DA AUDIÊNCIA" }, { tipo: "paragrafo", destaque: "corpo", texto: ENCERRA(tr_(ctx.assessor)) });
+    b.push({ tipo: "assinatura", linhas: [juiz ? juiz.replace(/^dr\.?a?\s+/i, "").toUpperCase() : "[NOME DO JUIZ DE DIREITO]", "Juiz de Direito", "(assinado digitalmente)"] });
+    return b;
+  }
+  /** Esqueleto do termo (sem a IA), com o que já se sabe; o resto entre [colchetes]. */
+  function termoEsqueleto(a, ctx = {}) {
+    const crim = a.area === "criminal";
+    const comarca = apenasComarca(ctx.comarca || a.comarca), vara = tr_(ctx.vara || a.vara) || "[vara / juízo]";
+    const juiz = tr_(ctx.juiz || a.juiz), juizN = juiz ? (/^dr/i.test(juiz) ? juiz : `Dr. ${juiz}`) : "[nome do Juiz de Direito]";
+    const dataTxt = a.data ? `${dataBr(a.data)}${a.hora ? ", às " + horaBr(a.hora) : ""}` : "[data e hora]";
+    const autor = tr_(a.autor) || "[parte autora]", reu = tr_(a.reu) || "[parte ré]";
+    const advA = tr_(a.advAutor), advR = tr_(a.advReu);
+    const L = ["PODER JUDICIÁRIO", comarca ? `Comarca de ${comarca}` : "Comarca de [comarca]", vara, "Sala de Audiências", "", "TERMO DE AUDIÊNCIA", "",
+      `Data: ${dataTxt}`, `Número do Processo: ${tr_(a.processo) || "[número do processo]"}`, `Natureza: ${tr_(a.classe) || "[natureza]"}`];
+    if (crim) { L.push(`Promotor: ${tr_(a.promotor) || "[promotor(a) de justiça]"}`, `Acusado: ${reu}`, `Advogado: ${advR || "[advogado(a)]"}`); if (tr_(a.vitimas)) L.push(`Vítima: ${tr_(a.vitimas)}`); }
+    else L.push(`Requerente: ${autor}`, `Advogado: ${advA || "[advogado(a) do requerente]"}`, `Requerido: ${reu}`, `Advogado: ${advR || "[advogado(a) do requerido]"}`);
+    const pres = [`[Presente presencialmente na sala de audiências] o Juiz de Direito, ${juizN}.`];
+    const est = (x) => x === "presente" ? "Presente" : x === "ausente" ? "Ausente" : "[Presente/Ausente]";
+    if (crim) pres.push(`${est(a.presMP)} o representante do Ministério Público.`, ponto(`${est(a.presReu)} o acusado ${reu}${advR ? `, acompanhado(a) de seu(sua) advogado(a), ${advR}` : ""}`));
+    else {
+      pres.push(ponto(`${est(a.presAutor)} o(a) requerente ${autor}${advA ? `, acompanhado(a) de seu(sua) advogado(a), ${advA}` : ""}`));
+      pres.push(ponto(`${est(a.presReu)} o(a) requerido(a) ${reu}${tr_(a.preposto) ? `, na pessoa de seu preposto ${tr_(a.preposto)}` : ""}${advR ? `, acompanhado(a) de seu(sua) advogado(a), ${advR}` : ""}`));
+    }
+    const tes = (a.testemunhas || []).filter((w) => w && w.name);
+    if (tes.length) pres.push(`Testemunhas: ${listaE(tes.map((w) => `${w.name} (${w.status === "dispensado" ? "dispensada" : w.status === "inquirido" ? "presente" : "[presente/ausente]"})`))}.`);
+    L.push("", "PRESENTES", pres.join(" "), "", "OCORRÊNCIAS", `Declarada aberta a audiência, na forma da lei, o ato foi realizado de modo ${modoTxt(a.modalidade)}. Na sequência, o Magistrado advertiu as partes acerca da vedação à divulgação não autorizada dos registros audiovisuais a pessoas estranhas ao processo.`);
+    L.push(tr_(a.ocorrencias) || "[Registrar as ocorrências: oitivas, requerimentos e decisões incidentais.]");
+    L.push("", "DELIBERAÇÕES", "Pelo MM. Juiz de Direito foi proferida a seguinte D E C I S Ã O:");
+    const dec = tr_(a.sentenca) || tr_(a.deliberacao);
+    L.push(dec ? dec.replace(/\*\*/g, "") : `[Texto da decisão. Se for o caso: encerrada a instrução, abra-se vista às partes para alegações finais / memoriais, no prazo sucessivo de ${tr_(a.prazoAlegacoes) || (crim ? "05 (cinco) dias" : "10 (dez) dias")}. Após, conclusos para sentença.]`);
+    L.push("", "ENCERRAMENTO DA AUDIÊNCIA", ENCERRA(tr_(ctx.assessor || a.assessor)), "", juiz ? juiz.replace(/^dr\.?a?\s+/i, "").toUpperCase() : "[NOME DO JUIZ DE DIREITO]", "Juiz de Direito", "(assinado digitalmente)");
+    return L.join("\n");
+  }
+  const SECOES_TERMO = ["PRESENTES", "OCORRÊNCIAS", "DELIBERAÇÕES", "ENCERRAMENTO DA AUDIÊNCIA"];
+  /** Texto do termo (da IA, do esqueleto ou editado) → blocos de layout. */
+  function termoParaBlocos(texto, ctx = {}) {
+    const linhas = String(texto || "").replace(/\r/g, "").replace(/\*\*/g, "").split("\n").map((l) => l.trim());
+    const b = [], ehTit = (l) => /^(TERMO|ATA)\s+DE\s+AUDI[ÊE]NCIA/i.test(l);
+    const it = linhas.findIndex(ehTit), cab = [];
+    if (it > 0) for (let k = 0; k < it; k++) if (linhas[k]) cab.push(linhas[k]);
+    b.push(cab.length ? { tipo: "cabecalho", linhas: cab.slice(0, 5) } : cabecalhoAud(apenasComarca(ctx.comarca), tr_(ctx.vara)));
+    b.push({ tipo: "titulo", texto: it >= 0 ? linhas[it].toUpperCase() : "TERMO DE AUDIÊNCIA" });
+    let i = it >= 0 ? it + 1 : 0, fim = linhas.length;
+    while (fim > 0 && !linhas[fim - 1]) fim--;
+    let ini = -1;
+    for (let k = fim - 1; k >= Math.max(i, fim - 6); k--) if (/^Ju[ií]z(a)?\s+de\s+Direito$/i.test(linhas[k])) { ini = k > i && linhas[k - 1] ? k - 1 : k; break; }
+    const assin = ini >= 0 ? linhas.slice(ini, fim).filter(Boolean) : [];
+    let emMeta = true;
+    for (; i < (ini >= 0 ? ini : fim); i++) {
+      const l = linhas[i]; if (!l) continue;
+      const sec = l.toUpperCase().replace(/:$/, "");
+      if (SECOES_TERMO.includes(sec)) { emMeta = false; b.push({ tipo: "secao", texto: sec }); continue; }
+      const m = emMeta ? /^([A-Za-zÀ-ú][^:]{1,45}):\s*(.*)$/.exec(l) : null;
+      if (m) { b.push({ tipo: "meta", rotulo: m[1] + ":", valor: m[2] }); continue; }
+      emMeta = false; b.push({ tipo: "paragrafo", destaque: "corpo", texto: l });
+    }
+    if (assin.length) b.push({ tipo: "assinatura", linhas: assin });
+    return b;
+  }
+  const escH = (x) => String(x == null ? "" : x).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+  const comCampos = (x) => escH(x).replace(/\[[^\]]{1,300}\]/g, (m) => `<span class="preencher">${m}</span>`);
+  /** Blocos → HTML do documento (a mesma marcação serve para a tela e para editar). */
+  function blocosParaHtml(bl, brasao) {
+    return bl.map((x) => {
+      if (x.tipo === "cabecalho") return `<div class="cab">${brasao ? `<img src="${brasao}" alt="Brasão do Estado de Goiás">` : ""}${x.linhas.map((l) => `<p>${escH(l)}</p>`).join("")}</div>`;
+      if (x.tipo === "titulo") return `<p class="titulo">${escH(x.texto)}</p>`;
+      if (x.tipo === "meta") return `<p class="meta"><span class="rot">${escH(x.rotulo)}</span> <b>${escH(x.valor)}</b></p>`;
+      if (x.tipo === "secao") return `<p class="secao">${escH(x.texto)}</p>`;
+      if (x.tipo === "paragrafo") return `<p class="${x.destaque || ""}">${x.destaque === "corpo" ? comCampos(x.texto) : escH(x.texto)}</p>`;
+      if (x.tipo === "lista") return `<ul>${x.itens.map((i) => `<li class="${[i.conferir ? "conf" : "", i.nivel === "alto" ? "alto" : ""].join(" ").trim()}">${escH(i.texto)}</li>`).join("")}</ul>`;
+      if (x.tipo === "quadro") return `<div class="quadro"><p class="qt">${escH(x.titulo)}</p><ul>${x.itens.map((i) => `<li class="${[i.conferir ? "conf" : "", i.alerta ? "alto" : ""].join(" ").trim()}">${escH(i.texto)}</li>`).join("")}</ul></div>`;
+      if (x.tipo === "assinatura") return `<div class="assin">${x.linhas.map((l) => `<p>${escH(l)}</p>`).join("")}</div>`;
+      return `<table><thead><tr>${x.colunas.map((c) => `<th>${escH(c)}</th>`).join("")}</tr></thead><tbody>${x.linhas.map((l) => `<tr class="${l.conferir ? "conf" : ""}">${l.celulas.map((c) => `<td>${escH(c)}</td>`).join("")}</tr>`).join("")}</tbody></table>`;
+    }).join("");
+  }
+  function blocosParaTexto(bl) {
+    return bl.map((x) => {
+      if (x.tipo === "cabecalho") return x.linhas.join("\n") + "\n";
+      if (x.tipo === "titulo") return x.texto.toUpperCase() + "\n";
+      if (x.tipo === "meta") return `${x.rotulo} ${x.valor}`;
+      if (x.tipo === "secao") return "\n" + x.texto.toUpperCase();
+      if (x.tipo === "paragrafo") return x.texto;
+      if (x.tipo === "lista") return x.itens.map((i) => "• " + i.texto).join("\n");
+      if (x.tipo === "quadro") return "\n" + x.titulo + "\n" + x.itens.map((i) => "• " + i.texto).join("\n");
+      if (x.tipo === "assinatura") return "\n" + x.linhas.join("\n");
+      return x.linhas.map((l) => "• " + l.celulas.map((c, i) => (x.colunas[i] ? x.colunas[i] + ": " : "") + c).join(" | ")).join("\n");
+    }).join("\n");
+  }
+
   /** Resposta JSON cortada pelo limite: recupera os objetos completos de "itens" já escritos. */
   function itensParciais(texto) {
     const t = String(texto || ""), ini = t.search(/"itens"\s*:\s*\[/);
@@ -521,5 +738,5 @@ ${lista}\n`;
     return { inicioContagem, vencimento: isoD(d), diasCorridos: Math.round((d - parseData(intimacao)) / 86400000), ignorados };
   }
 
-  root.AJ = { cleanPages, isNoiseLine, verificarFidelidade, paragrafosDensos, secao, normalizarDossie, mergeDossies, resumoExecutivo, pedidosNaoApreciados, chunkText, bytes, hashId, normalizarPrecedente, rankPrecedentes, parseSeries, calcularConsectarios, loc, calcularPrazo, detectarLocais, chaveTese, citacoesDeTeses, selecionarTeses, mesmaTese, itensParciais, fundamentacao, tpusPorAto, separarTpu, conferirTpu, TPU_INI, TPU_FIM, detectarInjecao, localInjecao, defesaInjecao, textoOcultoDoPdf, blocoTextoOculto };
+  root.AJ = { cleanPages, isNoiseLine, verificarFidelidade, paragrafosDensos, secao, normalizarDossie, mergeDossies, resumoExecutivo, pedidosNaoApreciados, chunkText, bytes, hashId, normalizarPrecedente, rankPrecedentes, parseSeries, calcularConsectarios, loc, calcularPrazo, detectarLocais, chaveTese, citacoesDeTeses, selecionarTeses, mesmaTese, itensParciais, fundamentacao, tpusPorAto, separarTpu, conferirTpu, TPU_INI, TPU_FIM, detectarInjecao, localInjecao, defesaInjecao, textoOcultoDoPdf, blocoTextoOculto, autosParaAudiencia, trechosParaPedido, conferirAta, blocosAtaPreliminar, termoEsqueleto, termoParaBlocos, blocosParaHtml, blocosParaTexto };
 })(typeof window !== "undefined" ? window : globalThis);

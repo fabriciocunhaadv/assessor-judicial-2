@@ -34,7 +34,7 @@
   S.caso = casoVazio();
 
   // ───────── Navegação ─────────
-  const TELAS = ["processo", "prompts", "teses", "historico"];
+  const TELAS = ["processo", "audiencia", "prompts", "teses", "historico"];
   function abrir(id) {
     for (const t of TELAS) { $("#t-" + t).setAttribute("aria-selected", String(t === id)); $("#" + t).hidden = t !== id; }
     window.scrollTo(0, 0);
@@ -1149,6 +1149,7 @@
       }
     } else pill("#st-db", "Dados: só nesta sessão", "warn");
     renderHistorico(); render();
+    document.dispatchEvent(new Event("tj:pronto"));
   }
   window.addEventListener("resize", () => { clearTimeout(window.__rz); window.__rz = setTimeout(renderPagina, 250); });
 
@@ -1160,5 +1161,7 @@
     "PROJUDI - Mov. 24 - Arq. 1 - Réplica\nA primeira autora impugna a autenticidade da biometria e afirma que a conta indicada foi aberta por terceiro, sem sua participação. Requer a inversão do ônus da prova.\nPROJUDI - Mov. 30 - Termo de Audiência de Instrução\nRealizada em 14/08/2025. Ausente proposta de acordo. A testemunha Ana Souza afirmou que acompanhou a autora à agência e que ela desconhecia a conta. As partes dispensaram outras provas. Autos conclusos para sentença.",
   ];
 
+  // Peças usadas pela Mesa de Audiência (audiencia.js)
+  window.TJ = { $, h, clear, L, novoId, S, ask, errMsg, showErr, toast, carregarScript, salvar, lerPdf, md, abrir };
   iniciar();
 })();
