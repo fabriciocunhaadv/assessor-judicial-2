@@ -347,11 +347,41 @@
     $("#aud-h").textContent = a.processo ? `Audiência · ${a.processo}` : "Audiência";
   }
 
+  /** Briefing em blocos do documento (mesmo layout da ata e do termo), para Word, PDF e cópia. */
+  function blocosBriefing(a) {
+    const b = a.briefing || {}, bl = [];
+    const dataTxt = a.data ? `${a.data.split("-").reverse().join("/")}${a.hora ? ", às " + a.hora.replace(":", "h") + "min" : ""}` : "[data e hora]";
+    bl.push({ tipo: "cabecalho", linhas: ["PODER JUDICIÁRIO", a.comarca ? `Comarca de ${String(a.comarca).replace(/^\s*comarca\s+de\s+/i, "")}` : "Comarca de [comarca]", a.vara || "[vara / juízo]", "Sala de Audiências"] });
+    bl.push({ tipo: "titulo", texto: "BRIEFING DA AUDIÊNCIA" });
+    bl.push({ tipo: "paragrafo", destaque: "aviso", texto: "Documento de apoio ao magistrado, elaborado a partir dos autos: matriz da instrução, pontos controvertidos com o ônus da prova, testemunhas e perguntas-chave." });
+    for (const [r, v] of [["Data:", dataTxt], ["Número do Processo:", a.processo || "não informado"], ["Natureza:", a.classe || "não informada"], ["Tipo de audiência:", TIPOS[a.tipo] || a.tipo], ["Requerente:", a.autor || "não informado"], ["Requerido:", a.reu || "não informado"]]) bl.push({ tipo: "meta", rotulo: r, valor: v });
+    const sec = (t, v) => { if (v && String(v).trim()) bl.push({ tipo: "secao", texto: t }, { tipo: "paragrafo", destaque: "corpo", texto: String(v).trim() }); };
+    sec("RESUMO", b.caseFactsSummary); sec("AUTOR — FATOS E PROVAS", b.plaintiffClaims); sec("RÉU — DEFESA E CONTRAPROVAS", b.defendantClaims);
+    sec("PEDIDO CONTRAPOSTO", b.counterClaim); sec("O QUE RESTA PROVAR EM AUDIÊNCIA", b.whatRemainsToProve);
+    bl.push({ tipo: "secao", texto: "PONTOS CONTROVERTIDOS" });
+    if (a.pontos.length) bl.push({ tipo: "tabela", colunas: ["Ponto", "Autor", "Réu", "Ônus", "Situação", "Onde consta"], linhas: a.pontos.map((p) => ({ celulas: [p.topic + (p.whatNeedsProof ? ` (falta provar: ${p.whatNeedsProof})` : ""), p.plaintiffPosition || "—", p.defendantPosition || "—", ONUS[p.burdenOfProof] || p.burdenOfProof || "—", SITPT[p.status] || "Pendente", p.localizacao || "—"] })) });
+    else bl.push({ tipo: "paragrafo", destaque: "vazio", texto: "Nenhum ponto controvertido identificado." });
+    const tes = a.testemunhas.filter((w) => w.name);
+    bl.push({ tipo: "secao", texto: "TESTEMUNHAS E DEPOIMENTOS" });
+    if (tes.length) {
+      bl.push({ tipo: "tabela", colunas: ["Nome", "Qualidade", "Ponto a esclarecer", "Situação", "Onde foi indicada"], linhas: tes.map((w) => ({ celulas: [w.name, PAPEIS[w.role] || w.role || "—", w.controversyTopic || "—", SIT_TEST[w.status] || "Aguardando", w.localizacao || "—"] })) });
+      for (const w of tes.filter((x) => x.questions)) bl.push({ tipo: "paragrafo", destaque: "corpo", texto: `Perguntas para ${w.name}:` }, { tipo: "lista", itens: String(w.questions).split("\n").map((l) => l.trim()).filter(Boolean).map((l) => ({ texto: l })) });
+    } else bl.push({ tipo: "paragrafo", destaque: "vazio", texto: "Nenhuma testemunha indicada." });
+    if (L(b.keyQuestions).length) bl.push({ tipo: "secao", texto: "PERGUNTAS-CHAVE" }, { tipo: "lista", itens: b.keyQuestions.map((q, i) => ({ texto: `${i + 1}. ${q}` })) });
+    if (L(b.alertsAndTraps).length) bl.push({ tipo: "secao", texto: "ALERTAS E ARMADILHAS" }, { tipo: "lista", itens: b.alertsAndTraps.map((q) => ({ texto: q, nivel: "alto" })) });
+    if (A.injecao && A.injecao.total) bl.push({ tipo: "paragrafo", destaque: "conferir", texto: `ALERTA: possível tentativa de manipular a IA nos autos (${A.injecao.total} trecho(s)): ` + A.injecao.achados.slice(0, 5).map((x) => `${AJ.localInjecao(x) || "local não identificado"} — ${x.categoria}`).join("; ") + "." });
+    return bl;
+  }
   function abaBriefing(a) {
     const b = a.briefing;
     const out = [h("div", { class: "row" }, botaoIA(b ? "Gerar de novo" : "Gerar briefing probatório", gerarBriefing), h("span", { class: "small muted", text: "Matriz da instrução: fatos e provas de cada parte, o que falta provar, pontos controvertidos com o ônus, testemunhas e perguntas-chave." }))];
     out.push(area("Observações do assessor para o Claude (opcional)", a.notasBriefing, (v) => { a.notasBriefing = v; salvarAud(); }, 2, "Ex.: a audiência foi redesignada a pedido do réu; conferir rol de testemunhas."));
     if (!b) return out;
+    const htmlB = () => AJ.blocosParaHtml(blocosBriefing(a), BRASAO);
+    out.push(h("div", { class: "row aud-acts" }, h("span", { class: "small muted", text: "Exportar o briefing (com as edições de ônus e situação feitas aqui):" }),
+      h("button", { class: "btn quiet sm", type: "button", onclick: () => copiarDoc(htmlB()), text: "Copiar" }),
+      h("button", { class: "btn quiet sm", type: "button", onclick: () => wordDoc(htmlB(), "briefing-audiencia"), text: "Word" }),
+      h("button", { class: "btn quiet sm", type: "button", onclick: () => pdfDoc(htmlB(), "briefing-audiencia"), text: "PDF" })));
     const bloco = (t, v) => v ? h("div", { class: "aud-card" }, h("h3", { text: t }), h("p", { text: v })) : null;
     out.push(h("div", { class: "aud-cards" }, bloco("Resumo", b.caseFactsSummary), bloco("Autor — fatos e provas", b.plaintiffClaims), bloco("Réu — defesa e contraprovas", b.defendantClaims), bloco("Pedido contraposto", b.counterClaim), bloco("O que resta provar", b.whatRemainsToProve)));
     out.push(h("h3", { class: "aud-sub", text: `Pontos controvertidos (${a.pontos.length})` }));
