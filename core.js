@@ -627,6 +627,33 @@ ${lista}\n`;
     }).join("\n");
   }
 
+  // ───────── Escolha do ato (regras do sistema principal) ─────────
+  /** Há petição de embargos de declaração nos autos? Sem ela, o ato nunca é "embargos" (a IA inventava os embargos e os vícios). */
+  function evidenciaEmbargos(autos) {
+    const t = semAcento(autos);
+    return /(?:opostos|oposicao d[eo]s?)\s+embargos\s+(?:de\s+declara|declarat)/.test(t)
+      || /(?:opor|opoe|opondo|oponho|interpor|interpoe)\s+(?:os\s+presentes\s+)?embargos\s+(?:de\s+)?declara/.test(t)
+      || /embargos\s+de\s+declaracao\s+com\s+pedido/.test(t)
+      || /peticao\s*[-–:]?\s*(?:de\s+)?embargos\s+de\s+declara/.test(t)
+      || /embargos[_\s-]*(?:de[_\s-]*)?declarac/.test(t) && /(?:embargante|aclaratorios|omissao|contradicao|obscuridade)/.test(t);
+  }
+  /** Certidão de decurso do prazo para o autor dar andamento "sob pena de extinção", no fim dos autos: o ato é a sentença (art. 485, III, § 1º, do CPC). */
+  function abandonoCertificado(autos) {
+    const t = semAcento(autos).replace(/⟦[^⟧]*⟧/g, " ");
+    const rx = /certifico\s+que\s+(?:transcorreu|decorreu)[^.]{0,220}(?:nada\s+fez|nao\s+se\s+manifest|in\s+albis|inerte|quedou-se)/g;
+    let ultimo = -1, m;
+    while ((m = rx.exec(t))) ultimo = m.index;
+    return ultimo >= 0 && ultimo > t.length * 0.9 && /sob\s+pena\s+de\s+extincao/.test(t.slice(Math.max(0, ultimo - 6000)));
+  }
+  /** Movimentações citadas na minuta que não existem nos carimbos dos autos (possível localização inventada); null se não há carimbos para conferir. */
+  function movsInexistentes(minuta, locais) {
+    const carimbos = new Set((locais || []).filter((l) => l && l.lido && l.mov).map((l) => Number(l.mov)));
+    if (carimbos.size < 3) return null;
+    const citadas = new Set();
+    for (const m of String(minuta || "").matchAll(/\bMov(?:imenta[cç][aã]o|imentos)?s?\.?\s*(\d{1,4})((?:\s*(?:,|e|a)\s*\d{1,4})*)/gi)) { citadas.add(Number(m[1])); for (const n of (m[2] || "").match(/\d{1,4}/g) || []) citadas.add(Number(n)); }
+    return [...citadas].filter((n) => !carimbos.has(n)).sort((a, b) => a - b);
+  }
+
   /** Resposta JSON cortada pelo limite: recupera os objetos completos de "itens" já escritos. */
   function itensParciais(texto) {
     const t = String(texto || ""), ini = t.search(/"itens"\s*:\s*\[/);
@@ -738,5 +765,5 @@ ${lista}\n`;
     return { inicioContagem, vencimento: isoD(d), diasCorridos: Math.round((d - parseData(intimacao)) / 86400000), ignorados };
   }
 
-  root.AJ = { cleanPages, isNoiseLine, verificarFidelidade, paragrafosDensos, secao, normalizarDossie, mergeDossies, resumoExecutivo, pedidosNaoApreciados, chunkText, bytes, hashId, normalizarPrecedente, rankPrecedentes, parseSeries, calcularConsectarios, loc, calcularPrazo, detectarLocais, chaveTese, citacoesDeTeses, selecionarTeses, mesmaTese, itensParciais, fundamentacao, tpusPorAto, separarTpu, conferirTpu, TPU_INI, TPU_FIM, detectarInjecao, localInjecao, defesaInjecao, textoOcultoDoPdf, blocoTextoOculto, autosParaAudiencia, trechosParaPedido, conferirAta, blocosAtaPreliminar, termoEsqueleto, termoParaBlocos, blocosParaHtml, blocosParaTexto };
+  root.AJ = { cleanPages, isNoiseLine, verificarFidelidade, paragrafosDensos, secao, normalizarDossie, mergeDossies, resumoExecutivo, pedidosNaoApreciados, chunkText, bytes, hashId, normalizarPrecedente, rankPrecedentes, parseSeries, calcularConsectarios, loc, calcularPrazo, detectarLocais, chaveTese, citacoesDeTeses, selecionarTeses, mesmaTese, itensParciais, fundamentacao, tpusPorAto, separarTpu, conferirTpu, TPU_INI, TPU_FIM, detectarInjecao, localInjecao, defesaInjecao, textoOcultoDoPdf, blocoTextoOculto, autosParaAudiencia, trechosParaPedido, conferirAta, blocosAtaPreliminar, termoEsqueleto, termoParaBlocos, blocosParaHtml, blocosParaTexto, evidenciaEmbargos, abandonoCertificado, movsInexistentes };
 })(typeof window !== "undefined" ? window : globalThis);

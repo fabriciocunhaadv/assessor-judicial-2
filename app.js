@@ -204,7 +204,9 @@
     // Texto em fonte branca (invisível a quem lê, lido pela IA): entra marcado no fim dos autos para o alerta de prompt injection.
     let oculto = [];
     try { oculto = await AJ.textoOcultoDoPdf(doc, pdfjs.OPS, { onProgress: (n, t) => onProgress(n, t, "oculto") }); } catch (e) { /* sem a varredura, segue a leitura */ }
-    return { doc, texto: AJ.cleanPages(paginas, true, cobertura >= 0.3 ? locais : null) + AJ.blocoTextoOculto(oculto), paginas: doc.numPages, locais: cobertura >= 0.3 ? locais : [], cobertura };
+    // Páginas sem texto legível (imagem): o Claude não as leu e não pode concluir por ausência de prova nelas.
+    const semTexto = paginas.map((t, i) => (t.replace(/\s+/g, "").length < 20 ? i + 1 : 0)).filter(Boolean);
+    return { doc, texto: AJ.cleanPages(paginas, true, cobertura >= 0.3 ? locais : null) + AJ.blocoTextoOculto(oculto), paginas: doc.numPages, locais: cobertura >= 0.3 ? locais : [], cobertura, semTexto: semTexto.length === doc.numPages ? [] : semTexto };
   }
   const drop = $("#drop"), fAutos = $("#f-autos");
   fAutos.addEventListener("change", () => { carregar(fAutos.files[0]); fAutos.value = ""; });
@@ -219,7 +221,7 @@
     try {
       const r = await lerPdf(file, (n, t, fase) => { bar.firstElementChild.style.width = (100 * n / t) + "%"; $("#drop-s").textContent = fase === "oculto" ? `Procurando texto escondido: página ${n} de ${t}` : `Página ${n} de ${t}`; });
       // Reabrindo do histórico: mantém a minuta e só acrescenta os autos.
-      const dados = { nome: file.name, autos: r.texto, paginas: r.paginas, pdf: r.doc, locais: r.locais, cobertura: r.cobertura, injecao: AJ.detectarInjecao(r.texto) };
+      const dados = { nome: file.name, autos: r.texto, paginas: r.paginas, pdf: r.doc, locais: r.locais, cobertura: r.cobertura, semTexto: r.semTexto, injecao: AJ.detectarInjecao(r.texto) };
       if (S.caso.minuta && !S.caso.autos && S.caso.reaberto) Object.assign(S.caso, dados);
       else novoCaso(dados);
       if (semMarcas(r.texto).trim().length < 300) showErr($("#gerar-err"), "Este PDF parece digitalizado sem texto (imagem). Aplique OCR antes de enviar.");
@@ -334,7 +336,7 @@
   }
   async function lerBloco(bloco, i, n, signal, nivel, onText) {
     for (let tentativa = 0; ; tentativa++) {
-      try { return [await ask(P.stage1(bloco, i, n) + defesa(), { json: true, signal, onText })]; }
+      try { return [await ask(P.stage1(bloco, i, n) + defesa() + (L(S.caso.semTexto).length ? "\n\n" + P.regraCobertura(S.caso.semTexto) : ""), { json: true, signal, onText })]; }
       catch (e) {
         if (e && e.code === "invalid_json" && nivel < 2 && bloco.length > 40000) {
           const [a, b] = AJ.chunkText(bloco, Math.ceil(bloco.length / 2) + 2000);
@@ -405,10 +407,19 @@
       // ETAPA 2 — redação, com o texto aparecendo enquanto é escrito.
       PROG.etapa = 2; PROG.agora = `Dossiê pronto: ${c.dossie.pedidos.length} pedido(s), ${c.dossie.cronologia.length} evento(s). O Claude está pensando na minuta…`; renderProg();
       const sugerido = { despacho: "despacho", decisao_interlocutoria: "decisao", saneamento: "decisao", sentenca: "sentenca", embargos_declaracao: "embargos" };
-      c.tipoAto = S.tipoAto !== "auto" ? S.tipoAto : (sugerido[c.dossie.atoSugerido] || "sentenca");
+      const temEmbargos = AJ.evidenciaEmbargos(c.autos);
+      const sugeridoAuto = AJ.abandonoCertificado(c.autos) ? "sentenca" : (sugerido[c.dossie.atoSugerido] || "sentenca");
+      c.tipoAto = S.tipoAto !== "auto" ? S.tipoAto : sugeridoAuto;
+      if (c.tipoAto === "embargos" && !temEmbargos) {
+        // sem petição de embargos de declaração nos autos, o ato nunca é "embargos" (a IA inventava os embargos e os vícios)
+        c.tipoAto = sugeridoAuto === "embargos" ? "decisao" : sugeridoAuto;
+        c.dossie.alertas = [...L(c.dossie.alertas), `Tipo "Embargos" ignorado: não há petição de embargos de declaração nos autos. Ato redigido: ${{ sentenca: "sentença", decisao: "decisão", despacho: "despacho" }[c.tipoAto] || c.tipoAto}.`];
+      } else if (S.tipoAto === "auto" && sugeridoAuto === "sentenca" && sugerido[c.dossie.atoSugerido] !== "sentenca" && AJ.abandonoCertificado(c.autos)) {
+        c.dossie.alertas = [...L(c.dossie.alertas), "Certidão de decurso do prazo para o autor dar andamento, sob pena de extinção, no fim dos autos: ato redigido como sentença (art. 485, III, § 1º, do CPC)."];
+      }
       const promptArea = S.prompts.find((x) => x.id === S.promptId) || null;
       const teses = AJ.selecionarTeses(S.teses, JSON.stringify(c.dossie) + " " + $("#t-instrucao").value, { area: promptArea ? promptArea.area : "" });
-      const montar = (d) => P.stage2({ dossie: d, paradigma: null, teses, precedentes: [], instrucao: $("#t-instrucao").value.trim(), tipoAto: c.tipoAto, promptArea, tpus: tpusDoAto(c.tipoAto) }) + defesa();
+      const montar = (d) => P.stage2({ dossie: d, paradigma: null, teses, precedentes: [], instrucao: $("#t-instrucao").value.trim(), tipoAto: c.tipoAto, promptArea, tpus: tpusDoAto(c.tipoAto), semTexto: L(c.semTexto) }) + defesa();
       let prompt = montar(c.dossie);
       if (AJ.bytes(prompt) > MAX_BYTES - 5000) prompt = montar(compactar(c.dossie, MAX_BYTES - 5000 - (AJ.bytes(prompt) - AJ.bytes(JSON.stringify(c.dossie)))));
       painel("p-minuta"); S.minAba = "texto"; renderMinuta();
@@ -453,7 +464,7 @@
   function conferencia() {
     const c = S.caso, corpo = AJ.separarTpu(c.minuta).corpo, fund = AJ.fundamentacao(corpo);
     const chaves = new Set(S.teses.map((t) => AJ.chaveTese(t.tipo, t.numero)).filter(Boolean));
-    return { fora: S.teses.length ? AJ.citacoesDeTeses(c.minuta).filter((x) => !chaves.has(x.chave)) : [], densos: AJ.paragrafosDensos(fund || c.minuta), nao: !c.dossie ? [] : c.apreciados ? c.dossie.pedidos.filter((p) => !c.apreciados.includes(p.id)) : AJ.pedidosNaoApreciados(c.dossie, c.minuta), sem: c.autos ? AJ.verificarFidelidade(corpo, c.autos) : [], tpu: AJ.conferirTpu(AJ.separarTpu(c.minuta).tpus, TABELA_TPU()) };
+    return { fora: S.teses.length ? AJ.citacoesDeTeses(c.minuta).filter((x) => !chaves.has(x.chave)) : [], densos: AJ.paragrafosDensos(fund || c.minuta), nao: !c.dossie ? [] : c.apreciados ? c.dossie.pedidos.filter((p) => !c.apreciados.includes(p.id)) : AJ.pedidosNaoApreciados(c.dossie, c.minuta), sem: c.autos ? AJ.verificarFidelidade(corpo, c.autos) : [], tpu: AJ.conferirTpu(AJ.separarTpu(c.minuta).tpus, TABELA_TPU()), movs: c.autos ? AJ.movsInexistentes(corpo, c.locais) : null };
   }
   function renderMinuta() {
     const c = S.caso, view = $("#min-view"), ed = $("#editor");
@@ -463,7 +474,7 @@
     if (S.minAba === "editar") { ed.value = c.minuta; return; }
     if (!c.minuta) return clear(view, h("div", { class: "placeholder" }, h("p", { text: c.autos ? "Autos prontos. Escolha o prompt e o tipo de ato e clique em Gerar minuta." : "Anexe os autos em PDF (ou use os autos de exemplo) para começar." }), h("p", { class: "small", text: "Etapa 1: o Claude extrai cronologia, pedidos de cada parte e provas com Mov./Arq./Pág. Etapa 2: redige relatório, fundamentação e dispositivo. Clique numa referência de página para abrir os autos nela." })));
     if (S.minAba === "texto") return clear(view, h("div", { class: "folha claude-out" }, md(c.minuta)));
-    const { densos, nao, sem, fora, tpu } = conferencia(), piso = !c.tipoAto || c.tipoAto === "sentenca" ? 14 : 0;
+    const { densos, nao, sem, fora, tpu, movs } = conferencia(), piso = !c.tipoAto || c.tipoAto === "sentenca" ? 14 : 0;
     const linha = (rot, n, bom) => h("div", { class: "check" }, h("span", { text: rot }), h("span", { class: "pill " + (bom ? "ok" : "bad"), text: String(n) }));
     clear(view, h("div", { class: "checks" },
       linha(piso ? "Parágrafos densos na fundamentação (mínimo 14)" : "Parágrafos densos na fundamentação", densos, densos >= piso),
@@ -471,11 +482,15 @@
       c.autos ? linha("Dados sem lastro nos autos", sem.length, !sem.length) : null,
       S.teses.length ? linha("Súmulas e temas fora do banco de teses", fora.length, !fora.length) : null,
       linha("TPU indicada e conferida na tabela", tpu.filter((t) => t.ok).length, tpu.length > 0 && tpu.every((t) => t.ok)),
-      c.injecao && c.injecao.verificado ? linha("Tentativas de dar ordens à IA nos autos", c.injecao.total, !c.injecao.total) : null),
+      c.injecao && c.injecao.verificado ? linha("Tentativas de dar ordens à IA nos autos", c.injecao.total, !c.injecao.total) : null,
+      movs ? linha("Movimentações citadas que não existem nos autos", movs.length, !movs.length) : null,
+      L(c.semTexto).length ? linha("Páginas sem texto (não lidas)", c.semTexto.length, false) : null),
       h("div", { class: "notes" }, nao.map((p) => h("div", { class: "bad", text: `${p.id} — ${p.litisconsorte}: ${p.descricao}` })), sem.map((d) => h("div", { class: "bad", text: `${d.tipo}: ${d.valor} não aparece nos autos` })),
         fora.map((x) => h("div", { class: "warn", text: `${x.rotulo}: não está no banco de teses — confira número e texto antes de usar` })),
         !tpu.length ? h("div", { class: "warn", text: "A minuta não indica a TPU do PROJUDI. No chat, use \"Indicar TPU\"." }) : null,
         tpu.filter((t) => !t.ok).map((t) => h("div", { class: "bad", text: `TPU "${t.linha}" não consta da tabela${t.sugestao ? ` (o código pertence a: ${t.sugestao})` : ""}.` })),
+        movs && movs.length ? h("div", { class: "bad", text: `A minuta cita ${movs.map((n) => "Mov. " + n).join(", ")}, que não aparece(m) nos carimbos dos autos — confira a localização.` }) : null,
+        L(c.semTexto).length ? h("div", { class: "warn", text: `Folhas do PDF sem texto legível, não lidas: ${c.semTexto.slice(0, 30).join(", ")}${c.semTexto.length > 30 ? "…" : ""}. Confira-as antes de aceitar qualquer conclusão por falta de prova (aplique OCR se forem documentos).` }) : null,
         c.dossie && c.dossie.alertas.length ? h("div", { class: "warn", text: "Alertas da Etapa 1: " + c.dossie.alertas.join(" · ") }) : null),
       piso && densos < piso && c.resumo ? h("div", { class: "row" }, h("button", { class: "btn quiet sm", type: "button", disabled: !!S.ctl || !S.cap.sample, onclick: aprofundar, text: "Aprofundar fundamentação" })) : null,
       !c.autos ? h("p", { class: "muted small", text: "Anexe os autos para conferir valores, datas e números." }) : null);
@@ -1098,7 +1113,7 @@
     if (c.autos) {
       $("#drop-t").textContent = c.nome;
       const cob = c.cobertura == null ? "" : c.cobertura >= 0.3 ? ` · Mov./Arq. lidos em ${Math.round(c.cobertura * 100)}% das páginas` : " · carimbos Mov./Arq. não encontrados: citações pela folha do PDF";
-      $("#drop-s").textContent = `${c.paginas} página(s)${cob}${c.exemplo ? " · fictícios" : ""}`;
+      $("#drop-s").textContent = `${c.paginas} página(s)${cob}${L(c.semTexto).length ? ` · ${c.semTexto.length} sem texto (não lidas)` : ""}${c.exemplo ? " · fictícios" : ""}`;
     } else if (!c.minuta) { $("#drop-t").textContent = "Anexar os autos em PDF"; $("#drop-s").textContent = "PROJUDI, PJe ou eproc · lidos aqui no navegador"; }
     renderInjecao(); renderMinuta(); renderAcoes(); renderChat(); renderPagina(); renderBusca(); renderBotoes();
   }

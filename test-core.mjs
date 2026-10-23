@@ -81,5 +81,11 @@ const esq = AJ.termoEsqueleto({ processo: "5001", autor: "Maria", reu: "Banco", 
 const blT = AJ.termoParaBlocos(esq);
 t("audiência: termo vira blocos (cabeçalho, metas, seções, assinatura)", blT[0].tipo === "cabecalho" && blT[1].texto === "TERMO DE AUDIÊNCIA" && blT.filter((b) => b.tipo === "secao").length === 4 && blT.some((b) => b.tipo === "meta" && b.rotulo === "Requerente:") && blT[blT.length - 1].tipo === "assinatura" && esq.includes("Presente o(a) requerente Maria") && !esq.includes("**"));
 t("audiência: trechos ligados ao pedido", AJ.trechosParaPedido("⟦PDF 1⟧ Certidão de intimação da testemunha Ana Souza positiva.\n\n⟦PDF 2⟧ Outra coisa qualquer sem relação nenhuma aqui.", "verifique a intimação da Ana").includes("Ana Souza"));
+// Regras novas do sistema principal: escolha do ato e conferência de movimentações
+t("embargos: sem petição não há embargos", !AJ.evidenciaEmbargos("O autor menciona que poderia opor recurso. Sentença proferida.") && AJ.evidenciaEmbargos("A ré vem opor os presentes embargos de declaração em face da sentença, por omissão."));
+const corpoAb = "x ".repeat(4000) + " Intime-se o autor para dar andamento ao feito em 5 dias, sob pena de extinção. " + "y ".repeat(200) + " CERTIFICO que decorreu o prazo e a parte autora nada fez.";
+t("abandono certificado no fim dos autos => sentença", AJ.abandonoCertificado(corpoAb) && !AJ.abandonoCertificado("CERTIFICO que decorreu o prazo e a parte autora nada fez. " + "z ".repeat(5000)));
+const locs = [1, 5, 12, 18].map((m) => ({ mov: String(m), arq: "1", pag: "1", lido: true }));
+t("movimentação citada inexistente é apontada", JSON.stringify(AJ.movsInexistentes("Conforme a decisão (Mov. 5) e a contestação (Mov. 18 e 44).", locs)) === "[44]" && AJ.movsInexistentes("Mov. 9", []) === null);
 console.log(`${ok} ok, ${fail} falhas`);
 if (fail) process.exit(1);
