@@ -654,6 +654,44 @@ ${lista}\n`;
     return [...citadas].filter((n) => !carimbos.has(n)).sort((a, b) => a - b);
   }
 
+  // ───────── Conferências da mecânica judicial (sem IA; só avisam, nunca alteram a minuta) ─────────
+  /** Juizado na capa e autos dizendo que a infração não é de menor potencial ofensivo, sem declínio na minuta. */
+  function avisoCompetencia(minuta, autos) {
+    const a = String(autos || ""), capa = a.slice(0, 8000);
+    const juizo = ((/Ju[ií]zo:\s*([^\n⟦]{5,140})/i.exec(capa) || [])[1] || "").trim();
+    if (!/juizado/i.test(juizo) && !/Juizado Especial/i.test(capa)) return null;
+    if (!/n[aã]o se trata de infra[cç][aã]o de menor potencial ofensivo/i.test(a)) return null;
+    if (/incompet[eê]ncia|decl[ií]n/i.test(String(minuta || ""))) return null;
+    return { juizo: juizo || "Juizado indicado na capa", motivo: "os autos afirmam que a infração não é de menor potencial ofensivo, mas a minuta não declina da competência" };
+  }
+  /** Frases que atribuem pedido ou manifestação a uma parte sem Mov. no mesmo período. */
+  function pedidosSemPeca(minuta) {
+    const t = String(minuta || "").replace(/\b(Mov|Arq|P[aá]gs?|fls?|arts?|n[ºo°]|Dr|Dra)\./gi, "$1\u0001");
+    const out = [];
+    for (const m of t.matchAll(/[^.\n]{0,160}\b(?:pugnou|requereu|manifestou-se|opinou|postulou)\b[^.\n]{0,200}\.?/gi)) {
+      const f = m[0].replace(/\u0001/g, ".").replace(/\*\*/g, "").trim();
+      if (!/Mov\.?\s*\d/i.test(f) && !/n[aã]o consta/i.test(f)) out.push(f.slice(0, 220));
+    }
+    return [...new Set(out)].slice(0, 5);
+  }
+  /** Títulos de etapas internas que vazaram para a minuta. */
+  function vazamentoInterno(minuta) {
+    return [...new Set([...String(minuta || "").matchAll(/DA APLICA[CÇ][AÃ]O DAS? TESES|CADERNO DE TESES|TESES E DIRETRIZES DO GABINETE|CHECKLIST|MATRIZ DE|CONTROLE FINAL|ETAPA INTERNA/gi)].map((m) => m[0].toUpperCase()))];
+  }
+  /** Citações "Mov. X, Arq. Y, Pág. Z" cujo arquivo ou página não existe nos carimbos lidos dos autos; null sem carimbos suficientes. */
+  function citacoesInvalidas(minuta, locais) {
+    const tot = new Map(), movs = new Set();
+    for (const l of locais || []) if (l && l.lido && l.mov && l.arq) { const k = `${Number(l.mov)}|${Number(l.arq)}`; tot.set(k, Math.max(tot.get(k) || 0, Number(l.tot) || 0, Number(l.pag) || 0)); movs.add(Number(l.mov)); }
+    if (movs.size < 3) return null;
+    const inv = new Set();
+    for (const c of String(minuta || "").matchAll(/Mov\.?\s*(\d{1,4})\s*,\s*Arq\.?\s*(\d{1,3})\s*,\s*P[aá]gs?\.?\s*(\d{1,4})/gi)) {
+      if (!movs.has(Number(c[1]))) continue; // movimentação inexistente já é apontada por movsInexistentes
+      const t = tot.get(`${Number(c[1])}|${Number(c[2])}`);
+      if (t === undefined || Number(c[3]) > t) inv.add(c[0].replace(/\s+/g, " "));
+    }
+    return [...inv].slice(0, 10);
+  }
+
   /** Resposta JSON cortada pelo limite: recupera os objetos completos de "itens" já escritos. */
   function itensParciais(texto) {
     const t = String(texto || ""), ini = t.search(/"itens"\s*:\s*\[/);
@@ -765,5 +803,5 @@ ${lista}\n`;
     return { inicioContagem, vencimento: isoD(d), diasCorridos: Math.round((d - parseData(intimacao)) / 86400000), ignorados };
   }
 
-  root.AJ = { cleanPages, isNoiseLine, verificarFidelidade, paragrafosDensos, secao, normalizarDossie, mergeDossies, resumoExecutivo, pedidosNaoApreciados, chunkText, bytes, hashId, normalizarPrecedente, rankPrecedentes, parseSeries, calcularConsectarios, loc, calcularPrazo, detectarLocais, chaveTese, citacoesDeTeses, selecionarTeses, mesmaTese, itensParciais, fundamentacao, tpusPorAto, separarTpu, conferirTpu, TPU_INI, TPU_FIM, detectarInjecao, localInjecao, defesaInjecao, textoOcultoDoPdf, blocoTextoOculto, autosParaAudiencia, trechosParaPedido, conferirAta, blocosAtaPreliminar, termoEsqueleto, termoParaBlocos, blocosParaHtml, blocosParaTexto, evidenciaEmbargos, abandonoCertificado, movsInexistentes };
+  root.AJ = { cleanPages, isNoiseLine, verificarFidelidade, paragrafosDensos, secao, normalizarDossie, mergeDossies, resumoExecutivo, pedidosNaoApreciados, chunkText, bytes, hashId, normalizarPrecedente, rankPrecedentes, parseSeries, calcularConsectarios, loc, calcularPrazo, detectarLocais, chaveTese, citacoesDeTeses, selecionarTeses, mesmaTese, itensParciais, fundamentacao, tpusPorAto, separarTpu, conferirTpu, TPU_INI, TPU_FIM, detectarInjecao, localInjecao, defesaInjecao, textoOcultoDoPdf, blocoTextoOculto, autosParaAudiencia, trechosParaPedido, conferirAta, blocosAtaPreliminar, termoEsqueleto, termoParaBlocos, blocosParaHtml, blocosParaTexto, evidenciaEmbargos, abandonoCertificado, movsInexistentes, avisoCompetencia, pedidosSemPeca, vazamentoInterno, citacoesInvalidas };
 })(typeof window !== "undefined" ? window : globalThis);

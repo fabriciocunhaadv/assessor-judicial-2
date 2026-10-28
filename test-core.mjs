@@ -87,5 +87,11 @@ const corpoAb = "x ".repeat(4000) + " Intime-se o autor para dar andamento ao fe
 t("abandono certificado no fim dos autos => sentença", AJ.abandonoCertificado(corpoAb) && !AJ.abandonoCertificado("CERTIFICO que decorreu o prazo e a parte autora nada fez. " + "z ".repeat(5000)));
 const locs = [1, 5, 12, 18].map((m) => ({ mov: String(m), arq: "1", pag: "1", lido: true }));
 t("movimentação citada inexistente é apontada", JSON.stringify(AJ.movsInexistentes("Conforme a decisão (Mov. 5) e a contestação (Mov. 18 e 44).", locs)) === "[44]" && AJ.movsInexistentes("Mov. 9", []) === null);
+// Mecânica judicial (sistema principal, 26/10)
+t("pedido de parte sem peça é apontado", AJ.pedidosSemPeca("O Ministério Público opinou pela prisão (Mov. 33). A defesa requereu a liberdade provisória.").length === 1);
+t("título interno na minuta é apontado", AJ.vazamentoInterno("### DA APLICAÇÃO DO CADERNO DE TESES\nTexto").length >= 1 && !AJ.vazamentoInterno("Texto normal.").length);
+const locsC = [{ mov: "1", arq: "1", pag: "1", tot: "2", lido: true }, { mov: "1", arq: "1", pag: "2", tot: "2", lido: true }, { mov: "5", arq: "1", pag: "1", lido: true }, { mov: "9", arq: "2", pag: "1", tot: "3", lido: true }];
+t("arquivo/página inexistentes são apontados", JSON.stringify(AJ.citacoesInvalidas("(Mov. 1, Arq. 1, Pág. 2) (Mov. 1, Arq. 1, Pág. 7) (Mov. 9, Arq. 4, Pág. 1)", locsC)) === JSON.stringify(["Mov. 1, Arq. 1, Pág. 7", "Mov. 9, Arq. 4, Pág. 1"]));
+t("competência: juizado com infração que não é de menor potencial", !!AJ.avisoCompetencia("Pelo exposto, recebo a denúncia.", "Juízo: Juizado Especial Criminal de Iporá\n... não se trata de infração de menor potencial ofensivo ...") && !AJ.avisoCompetencia("Declino da competência.", "Juízo: Juizado Especial Criminal\nnão se trata de infração de menor potencial ofensivo"));
 console.log(`${ok} ok, ${fail} falhas`);
 if (fail) process.exit(1);

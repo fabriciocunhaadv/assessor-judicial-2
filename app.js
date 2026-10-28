@@ -464,7 +464,8 @@
   function conferencia() {
     const c = S.caso, corpo = AJ.separarTpu(c.minuta).corpo, fund = AJ.fundamentacao(corpo);
     const chaves = new Set(S.teses.map((t) => AJ.chaveTese(t.tipo, t.numero)).filter(Boolean));
-    return { fora: S.teses.length ? AJ.citacoesDeTeses(c.minuta).filter((x) => !chaves.has(x.chave)) : [], densos: AJ.paragrafosDensos(fund || c.minuta), nao: !c.dossie ? [] : c.apreciados ? c.dossie.pedidos.filter((p) => !c.apreciados.includes(p.id)) : AJ.pedidosNaoApreciados(c.dossie, c.minuta), sem: c.autos ? AJ.verificarFidelidade(corpo, c.autos) : [], tpu: AJ.conferirTpu(AJ.separarTpu(c.minuta).tpus, TABELA_TPU()), movs: c.autos ? AJ.movsInexistentes(corpo, c.locais) : null };
+    return { fora: S.teses.length ? AJ.citacoesDeTeses(c.minuta).filter((x) => !chaves.has(x.chave)) : [], densos: AJ.paragrafosDensos(fund || c.minuta), nao: !c.dossie ? [] : c.apreciados ? c.dossie.pedidos.filter((p) => !c.apreciados.includes(p.id)) : AJ.pedidosNaoApreciados(c.dossie, c.minuta), sem: c.autos ? AJ.verificarFidelidade(corpo, c.autos) : [], tpu: AJ.conferirTpu(AJ.separarTpu(c.minuta).tpus, TABELA_TPU()), movs: c.autos ? AJ.movsInexistentes(corpo, c.locais) : null,
+      citInv: c.autos ? AJ.citacoesInvalidas(corpo, c.locais) : null, comp: c.autos ? AJ.avisoCompetencia(corpo, c.autos) : null, semPeca: AJ.pedidosSemPeca(corpo), vaz: AJ.vazamentoInterno(corpo) };
   }
   function renderMinuta() {
     const c = S.caso, view = $("#min-view"), ed = $("#editor");
@@ -474,7 +475,7 @@
     if (S.minAba === "editar") { ed.value = c.minuta; return; }
     if (!c.minuta) return clear(view, h("div", { class: "placeholder" }, h("p", { text: c.autos ? "Autos prontos. Escolha o prompt e o tipo de ato e clique em Gerar minuta." : "Anexe os autos em PDF (ou use os autos de exemplo) para começar." }), h("p", { class: "small", text: "Etapa 1: o Claude extrai cronologia, pedidos de cada parte e provas com Mov./Arq./Pág. Etapa 2: redige relatório, fundamentação e dispositivo. Clique numa referência de página para abrir os autos nela." })));
     if (S.minAba === "texto") return clear(view, h("div", { class: "folha claude-out" }, md(c.minuta)));
-    const { densos, nao, sem, fora, tpu, movs } = conferencia(), piso = !c.tipoAto || c.tipoAto === "sentenca" ? 14 : 0;
+    const { densos, nao, sem, fora, tpu, movs, citInv, comp, semPeca, vaz } = conferencia(), piso = !c.tipoAto || c.tipoAto === "sentenca" ? 14 : 0;
     const linha = (rot, n, bom) => h("div", { class: "check" }, h("span", { text: rot }), h("span", { class: "pill " + (bom ? "ok" : "bad"), text: String(n) }));
     clear(view, h("div", { class: "checks" },
       linha(piso ? "Parágrafos densos na fundamentação (mínimo 14)" : "Parágrafos densos na fundamentação", densos, densos >= piso),
@@ -484,11 +485,19 @@
       linha("TPU indicada e conferida na tabela", tpu.filter((t) => t.ok).length, tpu.length > 0 && tpu.every((t) => t.ok)),
       c.injecao && c.injecao.verificado ? linha("Tentativas de dar ordens à IA nos autos", c.injecao.total, !c.injecao.total) : null,
       movs ? linha("Movimentações citadas que não existem nos autos", movs.length, !movs.length) : null,
+      citInv ? linha("Arquivo/página citados que não existem nos autos", citInv.length, !citInv.length) : null,
+      linha("Pedido ou manifestação de parte sem a peça (Mov.)", semPeca.length, !semPeca.length),
+      vaz.length ? linha("Título de etapa interna na minuta", vaz.length, false) : null,
+      comp ? linha("Competência do juízo a conferir", 1, false) : null,
       L(c.semTexto).length ? linha("Páginas sem texto (não lidas)", c.semTexto.length, false) : null),
       h("div", { class: "notes" }, nao.map((p) => h("div", { class: "bad", text: `${p.id} — ${p.litisconsorte}: ${p.descricao}` })), sem.map((d) => h("div", { class: "bad", text: `${d.tipo}: ${d.valor} não aparece nos autos` })),
         fora.map((x) => h("div", { class: "warn", text: `${x.rotulo}: não está no banco de teses — confira número e texto antes de usar` })),
         !tpu.length ? h("div", { class: "warn", text: "A minuta não indica a TPU do PROJUDI. No chat, use \"Indicar TPU\"." }) : null,
         tpu.filter((t) => !t.ok).map((t) => h("div", { class: "bad", text: `TPU "${t.linha}" não consta da tabela${t.sugestao ? ` (o código pertence a: ${t.sugestao})` : ""}.` })),
+        comp ? h("div", { class: "bad", text: `Conferir competência: o juízo da capa (${comp.juizo}) parece incompatível com o objeto — ${comp.motivo}. Revise o ato antes de usar.` }) : null,
+        citInv && citInv.length ? h("div", { class: "warn", text: `Conferir citação: ${citInv.join("; ")} — o arquivo ou a página não existe nos carimbos dos autos.` }) : null,
+        semPeca.map((f) => h("div", { class: "warn", text: `Pedido ou manifestação sem localização — confirme se a peça existe: “${f}”` })),
+        vaz.length ? h("div", { class: "warn", text: `Título de etapa interna no texto: ${vaz.join(", ")}. Remova antes de usar.` }) : null,
         movs && movs.length ? h("div", { class: "bad", text: `A minuta cita ${movs.map((n) => "Mov. " + n).join(", ")}, que não aparece(m) nos carimbos dos autos — confira a localização.` }) : null,
         L(c.semTexto).length ? h("div", { class: "warn", text: `Folhas do PDF sem texto legível, não lidas: ${c.semTexto.slice(0, 30).join(", ")}${c.semTexto.length > 30 ? "…" : ""}. Confira-as antes de aceitar qualquer conclusão por falta de prova (aplique OCR se forem documentos).` }) : null,
         c.dossie && c.dossie.alertas.length ? h("div", { class: "warn", text: "Alertas da Etapa 1: " + c.dossie.alertas.join(" · ") }) : null),
